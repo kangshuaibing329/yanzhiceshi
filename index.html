@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#263348" />
+  <link rel="icon" href="data:," />
+  <title>面部风格分析报告</title>
+  <style>
+    :root {
+      --ink:#242936; --navy:#263348; --muted:#69717f; --paper:#f5f3ef; --card:#fffdf9;
+      --line:#e8e3dc; --accent:#9c5d55; --accent-dark:#78443e; --accent-soft:#f5e8e3;
+      --warm:#a46b34; --warm-soft:#fbf0e3; --shadow:0 16px 50px #26334812;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:#e9e6e1; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; -webkit-font-smoothing:antialiased; }
+    body.modal-open { overflow:hidden; }
+    button,input { font:inherit; }
+    button { -webkit-tap-highlight-color:transparent; }
+    .hidden { display:none !important; }
+    .app-shell { width:min(100%,620px); min-height:100vh; margin:0 auto; padding:0 18px 48px; background:var(--paper); box-shadow:0 0 42px #26334817; transition:width .25s ease; }
+    .app-shell.result-mode { width:min(100%,900px); }
+    .app-shell[data-theme="清冷感"] { --accent:#617f91; --accent-dark:#415d70; --accent-soft:#e7eef2; }
+    .app-shell[data-theme="甜感"] { --accent:#cb778c; --accent-dark:#9d5266; --accent-soft:#f9e7ec; }
+    .app-shell[data-theme="明艳感"] { --accent:#bd4d5f; --accent-dark:#8e3342; --accent-soft:#f8e3e6; }
+    .app-shell[data-theme="氛围感"] { --accent:#7f8661; --accent-dark:#5d6445; --accent-soft:#eceede; }
+    .topbar { margin:0 -18px 20px; padding:15px 20px 14px; background:var(--navy); color:#fff; text-align:center; }
+    .topbar strong { display:block; font-size:17px; letter-spacing:.5px; }
+    .topbar small { display:block; margin-top:4px; color:#cbd1da; font-size:11px; }
+    .card { border:1px solid var(--line); border-radius:22px; background:var(--card); box-shadow:var(--shadow); }
+    .muted { color:var(--muted); font-size:14px; line-height:1.8; }
+    .eyebrow { margin:0; color:var(--accent); font-size:11px; font-weight:850; letter-spacing:1.7px; }
+    h1,h2,h3,p { margin-top:0; }
+    h1 { margin:13px 0 14px; font-family:Georgia,"Songti SC","SimSun",serif; font-size:clamp(32px,8vw,44px); font-weight:600; line-height:1.16; letter-spacing:-1.5px; }
+
+    .intro { position:relative; overflow:hidden; padding:38px 30px 34px; margin-bottom:16px; }
+    .intro::after { content:""; position:absolute; width:180px; height:180px; right:-74px; top:-78px; border-radius:50%; background:var(--accent-soft); opacity:.75; }
+    .intro .muted { position:relative; z-index:1; max-width:490px; margin-bottom:0; }
+    .upload { padding:35px 26px 29px; border:1.5px dashed #c8aaa5; text-align:center; }
+    .upload-icon { width:60px; height:60px; margin:0 auto 16px; display:grid; place-items:center; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:32px; font-weight:300; }
+    .upload h2 { margin-bottom:8px; font-size:21px; }
+    .upload-copy { margin-bottom:20px; }
+    .primary-btn,.secondary-btn,.ghost-btn { min-height:50px; border-radius:13px; cursor:pointer; font-size:14px; font-weight:800; transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease; }
+    .primary-btn { width:100%; border:0; background:var(--accent); color:#fff; box-shadow:0 10px 24px #9c5d5540; }
+    .secondary-btn { border:0; background:var(--navy); color:#fff; }
+    .ghost-btn { border:1px solid #d9d4cd; background:#fff; color:var(--navy); }
+    .primary-btn:hover,.secondary-btn:hover,.ghost-btn:hover { transform:translateY(-1px); }
+    .primary-btn:focus-visible,.secondary-btn:focus-visible,.ghost-btn:focus-visible,.text-btn:focus-visible,.icon-btn:focus-visible { outline:3px solid #9c5d5545; outline-offset:2px; }
+    .primary-btn:disabled { cursor:not-allowed; opacity:.46; transform:none; box-shadow:none; }
+    .text-btn { border:0; background:transparent; color:var(--accent-dark); cursor:pointer; font-size:13px; font-weight:750; }
+    .status { min-height:18px; margin:11px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+
+    .preview { padding:18px; }
+    .preview-image-wrap { position:relative; overflow:hidden; border-radius:17px; background:#ebe8e3; }
+    .preview img { display:block; width:100%; height:min(58vh,520px); object-fit:contain; }
+    .preview.is-loading .preview-image-wrap::after { content:"正在读取面部关键点…"; position:absolute; inset:0; display:grid; place-items:center; background:#263348b5; color:#fff; font-size:14px; font-weight:800; backdrop-filter:blur(3px); }
+    .preview-meta { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:13px 2px 15px; }
+    .file-name { overflow:hidden; color:var(--muted); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+
+    .report { padding-bottom:10px; }
+    .result-hero { position:relative; overflow:hidden; padding:26px; background:linear-gradient(145deg,#fffdfa 0%,#fff 52%,var(--accent-soft) 140%); }
+    .result-hero::before { content:""; position:absolute; width:260px; height:260px; right:-120px; top:-130px; border-radius:50%; background:var(--accent-soft); opacity:.75; }
+    .hero-layout { position:relative; display:grid; grid-template-columns:210px minmax(0,1fr); gap:30px; z-index:1; }
+    .result-photo { position:relative; min-height:292px; overflow:hidden; border-radius:18px; background:#ebe8e3; box-shadow:0 12px 30px #2633481f; }
+    .result-photo img { width:100%; height:100%; display:block; object-fit:cover; }
+    .result-photo::after { content:"本次照片"; position:absolute; left:11px; bottom:11px; padding:5px 10px; border-radius:99px; background:#263348c7; color:#fff; font-size:10px; }
+    .result-copy { min-width:0; }
+    .score-line { display:flex; align-items:flex-end; gap:8px; margin:10px 0 5px; }
+    .score { color:var(--navy); font-family:Georgia,serif; font-size:82px; font-weight:400; line-height:.88; letter-spacing:-5px; }
+    .score-unit { padding-bottom:8px; color:var(--muted); font-size:13px; }
+    .score-label { margin:13px 0 8px; font-family:Georgia,"Songti SC","SimSun",serif; font-size:25px; line-height:1.35; }
+    .combo-name { margin:15px 0 4px; color:var(--accent-dark); font-size:24px; font-weight:900; letter-spacing:-.5px; }
+    .identity-line { margin:0 0 9px; color:var(--ink); font-size:13px; font-weight:750; }
+    .result-summary { margin-bottom:14px; }
+    .style-pill,.soft-pill,.tag { display:inline-flex; align-items:center; min-height:28px; padding:5px 11px; border-radius:99px; font-size:11px; line-height:1.35; }
+    .style-pill { background:var(--navy); color:#fff; font-weight:800; }
+    .soft-pill { background:var(--accent-soft); color:var(--accent-dark); font-weight:750; }
+    .tag { border:1px solid #ddd4d0; background:#fff; color:var(--accent-dark); }
+    .tag-row { display:flex; flex-wrap:wrap; gap:7px; }
+    .hero-metrics { position:relative; z-index:1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:20px; }
+    .metric-chip { padding:11px 13px; border:1px solid #e3dcd8; border-radius:13px; background:#ffffffc9; }
+    .metric-chip span { display:block; color:var(--muted); font-size:10px; }
+    .metric-chip strong { display:block; margin-top:3px; color:var(--navy); font-size:18px; }
+    .share-cta { position:relative; z-index:1; display:grid; grid-template-columns:1fr auto; align-items:center; gap:16px; margin-top:18px; padding:15px 16px; border-radius:16px; background:var(--navy); color:#fff; }
+    .share-cta strong { display:block; font-size:14px; }
+    .share-cta small { display:block; margin-top:4px; color:#cbd1da; font-size:11px; }
+    .share-cta button { min-height:40px; padding:0 16px; border:0; border-radius:11px; background:#fff; color:var(--navy); cursor:pointer; font-size:12px; font-weight:850; }
+    .top-retest { position:relative; z-index:1; margin-top:14px; padding:0; }
+
+    .report-section { margin-top:30px; }
+    .section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin:0 5px 12px; }
+    .section-heading p { margin:0 0 3px; color:var(--accent); font-size:10px; font-weight:850; letter-spacing:1.4px; }
+    .section-heading h2 { margin:0; font-family:Georgia,"Songti SC","SimSun",serif; font-size:23px; font-weight:650; letter-spacing:-.4px; }
+    .section-heading small { color:#8b8e94; font-size:11px; text-align:right; }
+    .dimension-card { padding:20px 22px; }
+    .dimension-row + .dimension-row { margin-top:17px; }
+    .dimension-head { display:flex; justify-content:space-between; gap:12px; margin-bottom:8px; font-size:13px; }
+    .dimension-head strong { font-size:14px; }
+    .dimension-head span { color:var(--accent-dark); font-weight:850; }
+    .meter { height:9px; overflow:hidden; border-radius:99px; background:#ece8e3; }
+    .meter i { display:block; width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#d7aaa4,var(--accent)); transition:width .8s ease; }
+    .insight-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:11px; }
+    .insight-card { min-height:156px; padding:19px; }
+    .insight-card.improve { background:var(--warm-soft); border-color:#eddbc6; }
+    .insight-label { color:var(--accent); font-size:10px; font-weight:900; letter-spacing:.8px; }
+    .insight-card.improve .insight-label { color:var(--warm); }
+    .insight-card h3 { margin:10px 0 8px; font-size:17px; }
+    .insight-card p { margin:0; color:var(--muted); font-size:12px; line-height:1.75; }
+    .advice-grid { display:grid; gap:12px; }
+    .advice-card { padding:21px; }
+    .advice-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    .advice-head strong { font-family:Georgia,"Songti SC","SimSun",serif; font-size:19px; }
+    .advice-head em { color:var(--accent); font-size:11px; font-style:normal; font-weight:850; }
+    .advice-body { display:grid; grid-template-columns:1.25fr 1fr 1.15fr; gap:12px; }
+    .advice-item { padding:13px; border-radius:12px; background:#f6f4f0; }
+    .advice-item.avoid { background:#faf5ef; }
+    .advice-item.action { background:var(--accent-soft); }
+    .advice-item b { display:block; margin-bottom:5px; color:var(--navy); font-size:11px; }
+    .advice-item p { margin:0; color:var(--muted); font-size:12px; line-height:1.68; }
+    .analysis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .analysis-card { padding:20px; }
+    .analysis-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .analysis-head strong { font-size:15px; }
+    .mini-score { color:var(--accent-dark); font-size:19px; font-weight:850; }
+    .analysis-card p { margin:10px 0 0; color:var(--muted); font-size:12px; line-height:1.72; }
+    .analysis-card .evidence { padding:10px 11px; border-radius:10px; background:#f4f2ee; color:#59606b; }
+    .photo-check { padding:19px 21px; border-left:4px solid var(--accent); }
+    .photo-check.warn { border-left-color:#ce8a49; background:#fffaf3; }
+    .check-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .check-head strong { font-size:15px; }
+    .check-state { color:var(--accent-dark); font-size:11px; font-weight:850; }
+    .photo-check.warn .check-state { color:var(--warm); }
+    .photo-check p { margin:8px 0 12px; }
+    .method { padding:20px 21px; background:#eeece7; box-shadow:none; }
+    .method strong { font-size:14px; }
+    .method p { margin:7px 0 0; color:#686d74; font-size:11px; line-height:1.78; }
+    .report-actions { display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:17px; }
+    .report-actions button { width:100%; }
+
+    .share-modal { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:18px; background:#1e2530db; backdrop-filter:blur(8px); }
+    .share-dialog { width:min(100%,500px); max-height:calc(100vh - 36px); overflow:auto; border-radius:22px; background:#f7f5f1; box-shadow:0 30px 90px #10141ca6; }
+    .share-head { position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:space-between; gap:15px; padding:15px 17px; border-bottom:1px solid #e6e1da; background:#f7f5f1ed; backdrop-filter:blur(10px); }
+    .share-head strong { display:block; font-size:15px; }
+    .share-head small { display:block; margin-top:3px; color:var(--muted); font-size:10px; }
+    .icon-btn { width:38px; height:38px; border:1px solid #ded8cf; border-radius:50%; background:#fff; color:var(--navy); cursor:pointer; font-size:20px; }
+    .share-options { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 18px 10px; color:var(--muted); font-size:12px; }
+    .privacy-toggle { display:flex; align-items:center; gap:8px; cursor:pointer; }
+    .privacy-toggle input { width:17px; height:17px; accent-color:var(--accent); }
+    .canvas-stage { padding:0 18px; }
+    .share-card-canvas { display:none; width:100%; height:auto; border-radius:14px; background:#fff; box-shadow:0 13px 34px #2633481c; }
+    .share-card-canvas.active { display:block; }
+    .share-nav { display:grid; grid-template-columns:38px 1fr 38px; align-items:center; gap:10px; padding:13px 18px 9px; }
+    .share-nav .icon-btn { width:38px; height:38px; font-size:16px; }
+    .share-dots { display:flex; justify-content:center; gap:7px; }
+    .share-dot { width:7px; height:7px; padding:0; border:0; border-radius:50%; background:#c9c4bc; cursor:pointer; }
+    .share-dot.active { width:19px; border-radius:99px; background:var(--accent); }
+    .share-download { padding:0 18px 18px; }
+    .share-download button { width:100%; }
+
+    @media (max-width:700px) {
+      .result-hero { padding:18px; }
+      .hero-layout { grid-template-columns:112px minmax(0,1fr); gap:16px; }
+      .result-photo { min-height:166px; align-self:start; }
+      .score { font-size:58px; letter-spacing:-3px; }
+      .score-label { margin-top:9px; font-size:19px; }
+      .combo-name { margin-top:11px; font-size:20px; }
+      .identity-line,.result-summary { font-size:12px; }
+      .hero-metrics,.share-cta { grid-column:1/-1; }
+      .insight-grid,.analysis-grid { grid-template-columns:1fr; }
+      .advice-body { grid-template-columns:1fr; }
+    }
+    @media (min-width:701px) {
+      .app-shell { margin:20px auto; min-height:calc(100vh - 40px); border-radius:25px; }
+      .topbar { border-radius:25px 25px 0 0; }
+    }
+    @media (max-width:430px) {
+      .app-shell { padding-inline:13px; }
+      .topbar { margin-inline:-13px; }
+      .intro { padding:31px 23px 28px; }
+      .upload { padding:30px 20px 25px; }
+      .section-heading small { display:none; }
+      .report-actions { grid-template-columns:1fr; }
+      .share-modal { padding:0; }
+      .share-dialog { width:100%; height:100%; max-height:none; border-radius:0; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
+    @media print {
+      body,.app-shell { background:#fff; box-shadow:none; }
+      .app-shell { width:100%; margin:0; padding:0; }
+      .topbar,.intro,.upload,.preview,.report-actions,.top-retest,.share-cta,.share-modal { display:none !important; }
+      .report { display:block !important; }
+      .card,.report-section { box-shadow:none; break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell" id="appShell">
+    <header class="topbar">
+      <strong id="topbarTitle">面部风格分析</strong>
+      <small id="topbarSubtitle">离线模型 · 照片仅用于本次分析</small>
+    </header>
+
+    <section class="intro card" id="introCard">
+      <p class="eyebrow">FACE STYLE REPORT</p>
+      <h1>不定义美丑，<br />只找到你的风格优势</h1>
+      <p class="muted">从面部关键点、比例关系、照片条件与风格倾向四个层面，生成一份有依据、能落地的视觉观察报告。</p>
+    </section>
+
+    <section class="upload card" id="uploadCard">
+      <div class="upload-icon" aria-hidden="true">＋</div>
+      <h2>上传一张正脸照片</h2>
+      <p class="muted upload-copy">自然光、无遮挡、少滤镜、单人正脸效果更稳定<br />支持 JPG、PNG、WebP，最大 8 MB</p>
+      <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+      <button class="primary-btn" id="chooseBtn" type="button">选择照片</button>
+      <p class="status" id="fileStatus" role="status" aria-live="polite"></p>
+      <p class="status" id="modelStatus" role="status" aria-live="polite">正在连接分析服务…</p>
+    </section>
+
+    <section class="preview card hidden" id="previewCard">
+      <div class="preview-image-wrap"><img id="previewImage" alt="待分析的照片预览" /></div>
+      <div class="preview-meta">
+        <span class="file-name" id="fileName">已选择照片</span>
+        <button class="text-btn" id="resetBtn" type="button">重新选择</button>
+      </div>
+      <button class="primary-btn" id="analyzeBtn" type="button" disabled>生成我的报告</button>
+      <p class="status" id="analysisStatus" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="report hidden" id="report" aria-label="面部风格分析报告">
+      <section class="result-hero card" id="resultHero">
+        <div class="hero-layout">
+          <div class="result-photo"><img id="resultThumb" alt="本次分析照片" /></div>
+          <div class="result-copy">
+            <p class="eyebrow">你的本次照片报告</p>
+            <div class="score-line"><span class="score" id="totalScore">—</span><span class="score-unit">/ 10</span></div>
+            <h2 class="score-label" id="scoreLabel">正在生成结论</h2>
+            <h3 class="combo-name" id="comboName">—</h3>
+            <p class="identity-line" id="identityLine"></p>
+            <p class="muted result-summary" id="scoreNote"></p>
+            <div class="tag-row" id="styleTags"></div>
+          </div>
+          <div class="hero-metrics">
+            <div class="metric-chip"><span>面部特征呈现</span><strong id="featureScore">—</strong></div>
+            <div class="metric-chip"><span>本次照片参考度</span><strong id="photoScore">—</strong></div>
+          </div>
+          <div class="share-cta">
+            <div><strong>这份报告适合发笔记</strong><small>已排版为 5 张 3:4 小红书图片</small></div>
+            <button id="shareBtn" type="button">生成报告图</button>
+          </div>
+          <button class="text-btn top-retest" id="retestTopBtn" type="button">换一张照片复测</button>
+        </div>
+      </section>
+
+      <section class="report-section">
+        <div class="section-heading"><div><p>01 · SNAPSHOT</p><h2>四项核心观察</h2></div><small>分数只描述当前照片</small></div>
+        <div class="dimension-card card" id="dimensionOverview"></div>
+      </section>
+
+      <section class="report-section">
+        <div class="section-heading"><div><p>02 · KEY FINDINGS</p><h2>先看最值得记住的三点</h2></div><small>两项优势，一个优先动作</small></div>
+        <div class="insight-grid" id="insightGrid"></div>
+      </section>
+
+      <section class="report-section">
+        <div class="section-heading"><div><p>03 · STYLE FORMULA</p><h2>你的显美公式</h2></div><small>妆容、发型、日常搭配</small></div>
+        <div class="advice-grid" id="adviceGrid"></div>
+      </section>
+
+      <section class="report-section">
+        <div class="section-heading"><div><p>04 · DETAILS</p><h2>五官、骨相与皮相观察</h2></div><small>观察依据与建议分开呈现</small></div>
+        <div class="analysis-grid" id="analysisGrid"></div>
+      </section>
+
+      <section class="report-section">
+        <div class="section-heading"><div><p>05 · PHOTO REFERENCE</p><h2>本次照片参考度</h2></div><small>不把拍照问题当成颜值问题</small></div>
+        <div class="photo-check card" id="photoCheck">
+          <div class="check-head"><strong>照片条件检查</strong><span class="check-state" id="photoCheckTitle">—</span></div>
+          <p class="muted" id="photoCheckMessage"></p>
+          <div class="tag-row" id="photoCheckTags"></div>
+        </div>
+      </section>
+
+      <section class="report-section method card">
+        <strong>结果边界与隐私说明</strong>
+        <p id="methodNotice">本报告只观察当前照片中的可见视觉特征，不代表固定颜值或人群排名。</p>
+        <p id="methodMetrics"></p>
+        <p>照片通过 HTTPS 发送至本站服务器上的离线模型，处理后不做持久化保存；本工具不用于身份识别、医疗判断或现实价值评价。</p>
+      </section>
+
+      <div class="report-actions">
+        <button class="ghost-btn" id="retestBottomBtn" type="button">换一张照片</button>
+        <button class="secondary-btn" id="downloadBtn" type="button">打印 / 保存 PDF</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="share-modal hidden" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareDialogTitle">
+    <section class="share-dialog">
+      <header class="share-head">
+        <div><strong id="shareDialogTitle">小红书报告图</strong><small>5 张 · 1080 × 1440 · 3:4</small></div>
+        <button class="icon-btn" id="closeShareBtn" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="share-options">
+        <label class="privacy-toggle"><input id="hidePhotoToggle" type="checkbox" /> 隐藏本人照片再分享</label>
+        <span id="cardCounter">1 / 5</span>
+      </div>
+      <div class="canvas-stage" id="canvasStage">
+        <canvas class="share-card-canvas active" width="1080" height="1440" aria-label="分享图第1张"></canvas>
+        <canvas class="share-card-canvas" width="1080" height="1440" aria-label="分享图第2张"></canvas>
+        <canvas class="share-card-canvas" width="1080" height="1440" aria-label="分享图第3张"></canvas>
+        <canvas class="share-card-canvas" width="1080" height="1440" aria-label="分享图第4张"></canvas>
+        <canvas class="share-card-canvas" width="1080" height="1440" aria-label="分享图第5张"></canvas>
+      </div>
+      <nav class="share-nav" aria-label="切换报告图">
+        <button class="icon-btn" id="prevCardBtn" type="button" aria-label="上一张">←</button>
+        <div class="share-dots" id="shareDots"></div>
+        <button class="icon-btn" id="nextCardBtn" type="button" aria-label="下一张">→</button>
+      </nav>
+      <div class="share-download"><button class="primary-btn" id="downloadCardBtn" type="button">下载当前图片</button></div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { file:null, previewUrl:null, serviceReady:false, view:"upload", reportData:null, shareIndex:0, photoImage:null };
+    const MAX_FILE_BYTES = 8 * 1024 * 1024;
+    const ALLOWED_FILE_TYPES = new Set(["image/jpeg","image/png","image/webp"]);
+    const shareCanvases = [...document.querySelectorAll(".share-card-canvas")];
+
+    function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+    function make(tag,className,text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+    function appendTags(container,tags) { clearChildren(container); tags.forEach((value)=>container.appendChild(make("span","tag",value))); }
+    function setView(view) {
+      state.view=view; const isUpload=view==="upload"; const isPreview=view==="preview"||view==="analyzing"; const isReport=view==="report";
+      $("introCard").classList.toggle("hidden",!isUpload); $("uploadCard").classList.toggle("hidden",!isUpload); $("previewCard").classList.toggle("hidden",!isPreview); $("report").classList.toggle("hidden",!isReport);
+      $("appShell").classList.toggle("result-mode",isReport); $("previewCard").classList.toggle("is-loading",view==="analyzing");
+      $("topbarTitle").textContent=isReport?"你的面部风格报告":"面部风格分析"; $("topbarSubtitle").textContent=isReport?"当前照片视觉观察 · 不是固定颜值结论":"离线模型 · 照片仅用于本次分析";
+    }
+    function renderDimensions(sections) {
+      const container=$("dimensionOverview"); clearChildren(container);
+      sections.forEach((item)=>{ const row=make("div","dimension-row"); const head=make("div","dimension-head"); head.append(make("strong","",item.name),make("span","",`${item.score.toFixed(1)} / 10`)); const meter=make("div","meter"); const fill=make("i"); fill.style.width=`${Math.max(0,Math.min(100,item.score*10))}%`; meter.appendChild(fill); row.append(head,meter); container.appendChild(row); });
+    }
+    function renderInsights(data) {
+      const container=$("insightGrid"); clearChildren(container);
+      data.highlights.forEach((item,index)=>{ const card=make("article","insight-card card"); card.append(make("span","insight-label",`优势 0${index+1}`),make("h3","",item.title),make("p","",item.text)); container.appendChild(card); });
+      const improvement=make("article","insight-card improve card"); improvement.id="improvementCard"; improvement.append(make("span","insight-label","优先动作"),make("h3","",data.improvement.title),make("p","",data.improvement.text)); container.appendChild(improvement);
+    }
+    function renderAnalysis(sections) {
+      const container=$("analysisGrid"); clearChildren(container);
+      sections.forEach((item)=>{ const card=make("article","analysis-card card"); const head=make("div","analysis-head"); head.append(make("strong","",item.name),make("span","mini-score",item.score.toFixed(1))); const observation=make("p"); observation.append(make("b","","观察："),document.createTextNode(item.observation)); const evidence=make("p","evidence"); evidence.append(make("b","","依据："),document.createTextNode(item.evidence)); const suggestion=make("p"); suggestion.append(make("b","","建议："),document.createTextNode(item.suggestion)); card.append(head,observation,evidence,suggestion); container.appendChild(card); });
+    }
+    function renderAdvice(items) {
+      const container=$("adviceGrid"); clearChildren(container);
+      items.forEach((item,index)=>{ const card=make("article","advice-card card"); const head=make("div","advice-head"); head.append(make("strong","",`${String(index+1).padStart(2,"0")} · ${item.title}`),make("em","",item.label)); const body=make("div","advice-body"); [["advice-item","适合",item.text],["advice-item avoid","尽量避免",item.avoid],["advice-item action","今天就能做",item.action]].forEach(([className,label,value])=>{ const block=make("div",className); block.append(make("b","",label),make("p","",value)); body.appendChild(block); }); card.append(head,body); container.appendChild(card); });
+    }
+    function renderReport(data) {
+      state.reportData=data; $("appShell").dataset.theme=data.style.name; $("resultThumb").src=state.previewUrl; $("totalScore").textContent=data.score.toFixed(1); $("scoreLabel").textContent=data.score_label; $("comboName").textContent=data.style.combo_name; $("identityLine").textContent=data.style.identity; $("scoreNote").textContent=data.summary; $("featureScore").textContent=`${data.overview.feature_score.toFixed(1)} / 10`; $("photoScore").textContent=data.photo_check.reference;
+      appendTags($("styleTags"),data.style.tags); $("photoCheck").classList.toggle("warn",data.photo_check.tone==="warn"); $("photoCheckTitle").textContent=data.photo_check.status; $("photoCheckMessage").textContent=data.photo_check.message; appendTags($("photoCheckTags"),data.photo_check.tags); renderDimensions(data.sections); renderInsights(data); renderAdvice(data.advice); renderAnalysis(data.sections); $("methodNotice").textContent=data.method.notice; $("methodMetrics").textContent=`分析依据：${data.method.metrics}。模型：${data.method.model}。`; setView("report"); window.scrollTo({top:0,behavior:"smooth"});
+    }
+
+    function paletteFor(styleName) {
+      return {"清冷感":{bg:"#eef3f5",paper:"#fbfdfe",ink:"#233342",accent:"#617f91",soft:"#dfe9ee",warm:"#b88772"},"甜感":{bg:"#fff1f3",paper:"#fffafa",ink:"#432f36",accent:"#c8758b",soft:"#f7dfe6",warm:"#bc8067"},"明艳感":{bg:"#fff1ef",paper:"#fffaf8",ink:"#3b2529",accent:"#b94759",soft:"#f5dce0",warm:"#a87745"},"氛围感":{bg:"#f2f2e9",paper:"#fbfbf6",ink:"#30352a",accent:"#7e865e",soft:"#e7e9d6",warm:"#a7764f"}}[styleName]||{bg:"#f3f1ed",paper:"#fffdfa",ink:"#263348",accent:"#9c5d55",soft:"#eee2dd",warm:"#a46b34"};
+    }
+    function roundedRect(ctx,x,y,w,h,r,fill,stroke) { ctx.beginPath(); ctx.roundRect(x,y,w,h,r); if(fill){ctx.fillStyle=fill;ctx.fill();} if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();} }
+    function text(ctx,value,x,y,size,color,weight="600",align="left",family='"PingFang SC","Microsoft YaHei",sans-serif') { ctx.fillStyle=color; ctx.font=`${weight} ${size}px ${family}`; ctx.textAlign=align; ctx.textBaseline="top"; ctx.fillText(String(value),x,y); }
+    function wrapLines(ctx,value,maxWidth,maxLines=99) { const chars=[...String(value)]; const lines=[]; let line=""; for(const char of chars){const trial=line+char;if(ctx.measureText(trial).width>maxWidth&&line){lines.push(line);line=char;}else line=trial;if(lines.length===maxLines)break;} if(line&&lines.length<maxLines)lines.push(line); if(lines.length===maxLines&&chars.join("")!==lines.join(""))lines[maxLines-1]=lines[maxLines-1].slice(0,-1)+"…"; return lines; }
+    function wrapped(ctx,value,x,y,maxWidth,size,lineHeight,color,weight="500",maxLines=99) { ctx.font=`${weight} ${size}px "PingFang SC","Microsoft YaHei",sans-serif`; const lines=wrapLines(ctx,value,maxWidth,maxLines); lines.forEach((line,index)=>text(ctx,line,x,y+index*lineHeight,size,color,weight)); return y+lines.length*lineHeight; }
+    function pill(ctx,label,x,y,palette) { ctx.font='700 28px "PingFang SC","Microsoft YaHei",sans-serif'; const width=ctx.measureText(label).width+44; roundedRect(ctx,x,y,width,54,27,palette.soft); text(ctx,label,x+22,y+11,28,palette.accent,"700"); return width; }
+    function cardBase(ctx,palette,index,kicker) { ctx.clearRect(0,0,1080,1440); ctx.fillStyle=palette.bg; ctx.fillRect(0,0,1080,1440); ctx.fillStyle=palette.soft; ctx.beginPath(); ctx.arc(965,98,230,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=.28; ctx.beginPath(); ctx.arc(100,1370,190,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; text(ctx,"FACE STYLE REPORT",72,64,24,palette.accent,"800"); text(ctx,kicker,1008,65,22,palette.ink,"650","right"); text(ctx,`0${index} / 05`,72,1350,20,palette.accent,"800"); text(ctx,"当前照片视觉观察 · 仅供风格参考",1008,1348,18,palette.ink,"500","right"); }
+    function drawCoverImage(ctx,image,x,y,w,h,r) { ctx.save(); ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.clip(); const imageRatio=image.width/image.height,targetRatio=w/h; let sx=0,sy=0,sw=image.width,sh=image.height; if(imageRatio>targetRatio){sw=image.height*targetRatio;sx=(image.width-sw)/2;}else{sh=image.width/targetRatio;sy=(image.height-sh)/2;} ctx.drawImage(image,sx,sy,sw,sh,x,y,w,h); ctx.restore(); }
+    function metricBar(ctx,label,score,x,y,width,palette) { text(ctx,label,x,y,28,palette.ink,"650"); text(ctx,score.toFixed(1),x+width,y-3,34,palette.accent,"800","right"); roundedRect(ctx,x,y+48,width,14,7,"#dddcd6"); roundedRect(ctx,x,y+48,width*Math.max(0,Math.min(1,score/10)),14,7,palette.accent); }
+    function insightBox(ctx,label,title,body,x,y,w,h,palette,warm=false) { roundedRect(ctx,x,y,w,h,28,warm?"#fff1e2":palette.paper,warm?"#e9cda9":palette.soft); text(ctx,label,x+34,y+30,20,warm?palette.warm:palette.accent,"800"); text(ctx,title,x+34,y+70,34,palette.ink,"800"); wrapped(ctx,body,x+34,y+124,w-68,25,39,palette.ink,"500",4); }
+    function drawShareCards() {
+      const data=state.reportData;if(!data)return;const p=paletteFor(data.style.name),hide=$("hidePhotoToggle").checked;shareCanvases.forEach((canvas)=>{canvas.width=1080;canvas.height=1440;});
+      let ctx=shareCanvases[0].getContext("2d");cardBase(ctx,p,1,"我的风格答案");
+      if(!hide&&state.photoImage)drawCoverImage(ctx,state.photoImage,72,135,936,565,42);else{roundedRect(ctx,72,135,936,565,42,p.paper,p.soft);ctx.fillStyle=p.soft;ctx.beginPath();ctx.arc(540,410,175,0,Math.PI*2);ctx.fill();text(ctx,"MY STYLE",540,376,54,p.accent,"800","center",'Georgia,"Times New Roman",serif');text(ctx,"已隐藏本人照片",540,452,24,p.ink,"600","center");}
+      roundedRect(ctx,790,620,170,122,28,p.accent);text(ctx,data.score.toFixed(1),875,632,70,"#fff","700","center",'Georgia,"Times New Roman",serif');text(ctx,"/ 10",875,704,20,"#fff","600","center");text(ctx,"我测出来是",72,774,31,p.ink,"650");wrapped(ctx,`「${data.style.combo_name}」`,72,824,920,70,84,p.accent,"850",2);text(ctx,data.style.identity,72,1015,32,p.ink,"750");wrapped(ctx,data.style.share_line,72,1070,900,27,42,p.ink,"500",3);let px=72;data.share.keywords.forEach((tag)=>{px+=pill(ctx,tag,px,1225,p)+12;});
+      ctx=shareCanvases[1].getContext("2d");cardBase(ctx,p,2,"四项核心观察");text(ctx,"这张照片里的",72,154,32,p.ink,"600");text(ctx,"颜值呈现报告",72,202,66,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');text(ctx,data.score.toFixed(1),890,155,118,p.accent,"700","center",'Georgia,"Times New Roman",serif');text(ctx,"综合呈现分",890,282,22,p.ink,"600","center");roundedRect(ctx,72,350,936,725,40,p.paper,p.soft);data.sections.forEach((item,index)=>metricBar(ctx,item.name,item.score,126,420+index*145,828,p));roundedRect(ctx,72,1115,936,142,30,p.accent);text(ctx,data.style.combo_name,112,1143,42,"#fff","850");wrapped(ctx,data.style.identity,112,1202,820,24,34,"#fff","550",2);
+      ctx=shareCanvases[2].getContext("2d");cardBase(ctx,p,3,"优势与提升点");text(ctx,"最值得记住的",72,154,32,p.ink,"600");text(ctx,"两个优势，一个动作",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');insightBox(ctx,"优势 01",data.highlights[0].title,data.highlights[0].text,72,340,936,248,p);insightBox(ctx,"优势 02",data.highlights[1].title,data.highlights[1].text,72,620,936,248,p);insightBox(ctx,"优先动作",data.improvement.title,data.improvement.text,72,900,936,276,p,true);wrapped(ctx,"你不需要同时改变所有地方。先做最小的一步，再用同光线照片前后对比。",72,1214,910,24,36,p.ink,"550",3);
+      ctx=shareCanvases[3].getContext("2d");cardBase(ctx,p,4,"妆发公式");text(ctx,"适合你的",72,154,32,p.ink,"600");text(ctx,"妆容 × 发型公式",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');[data.advice[0],data.advice[1]].forEach((item,index)=>{const y=350+index*430;roundedRect(ctx,72,y,936,388,36,p.paper,p.soft);text(ctx,`${String(index+1).padStart(2,"0")} · ${item.title}`,112,y+38,36,p.accent,"850");text(ctx,"适合",112,y+102,22,p.ink,"800");wrapped(ctx,item.text,112,y+140,836,24,38,p.ink,"500",4);roundedRect(ctx,112,y+286,836,70,18,p.soft);text(ctx,"先做：",136,y+306,22,p.accent,"800");wrapped(ctx,item.action,220,y+303,700,20,30,p.ink,"550",2);});text(ctx,"关键词",72,1240,22,p.ink,"700");let p4x=180;data.share.keywords.forEach((tag)=>{p4x+=pill(ctx,tag,p4x,1222,p)+12;});
+      ctx=shareCanvases[4].getContext("2d");cardBase(ctx,p,5,"搭配与拍照提示");text(ctx,"把风格延续到",72,154,32,p.ink,"600");text(ctx,"日常搭配与照片里",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');roundedRect(ctx,72,350,936,330,38,p.paper,p.soft);text(ctx,"日常搭配",112,392,36,p.accent,"850");wrapped(ctx,data.advice[2].text,112,456,836,27,42,p.ink,"500",4);roundedRect(ctx,112,585,836,62,16,p.soft);text(ctx,"先做：",136,603,21,p.accent,"800");wrapped(ctx,data.advice[2].action,214,601,700,20,30,p.ink,"550",2);roundedRect(ctx,72,720,936,330,38,p.paper,p.soft);text(ctx,"拍照提示",112,762,36,p.accent,"850");text(ctx,data.photo_check.status,112,824,27,p.ink,"750");wrapped(ctx,data.photo_check.message,112,876,836,25,39,p.ink,"500",4);let p5x=112;data.photo_check.tags.slice(0,3).forEach((tag)=>{p5x+=pill(ctx,tag,p5x,970,p)+12;});roundedRect(ctx,72,1092,936,166,30,p.accent);text(ctx,"真正适合你的，不是固定模板",112,1125,32,"#fff","800");wrapped(ctx,"而是让五官重点、发型轮廓与整体色调彼此配合。",112,1178,820,24,36,"#fff","500",2);
+    }
+    function showShareCard(index) { state.shareIndex=(index+shareCanvases.length)%shareCanvases.length;shareCanvases.forEach((canvas,i)=>canvas.classList.toggle("active",i===state.shareIndex));[...$("shareDots").children].forEach((dot,i)=>dot.classList.toggle("active",i===state.shareIndex));$("cardCounter").textContent=`${state.shareIndex+1} / ${shareCanvases.length}`; }
+    function ensurePhotoImage() { if(state.photoImage)return Promise.resolve(state.photoImage);return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{state.photoImage=image;resolve(image);};image.onerror=reject;image.src=state.previewUrl;}); }
+    async function openShareStudio() { try{await ensurePhotoImage();}catch(_){state.photoImage=null;$("hidePhotoToggle").checked=true;}drawShareCards();showShareCard(0);$("shareModal").classList.remove("hidden");document.body.classList.add("modal-open");$("closeShareBtn").focus(); }
+    function closeShareStudio() { $("shareModal").classList.add("hidden");document.body.classList.remove("modal-open"); }
+    function setupShareDots() { clearChildren($("shareDots"));shareCanvases.forEach((_,index)=>{const dot=make("button","share-dot");dot.type="button";dot.setAttribute("aria-label",`查看第 ${index+1} 张`);dot.addEventListener("click",()=>showShareCard(index));$("shareDots").appendChild(dot);}); }
+    function downloadCurrentCard() { const canvas=shareCanvases[state.shareIndex];canvas.toBlob((blob)=>{if(!blob)return;const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`面部风格报告-${state.shareIndex+1}.png`;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);},"image/png"); }
+
+    async function readResponse(response) { const contentType=response.headers.get("content-type")||"";if(contentType.includes("application/json"))return response.json();const body=await response.text();return{detail:body.trim()||`服务返回错误（${response.status}）`}; }
+    async function checkService() { try{const response=await fetch("health",{cache:"no-store"});if(!response.ok)throw new Error("服务不可用");const status=await response.json();state.serviceReady=status.status==="ok"&&status.offline===true;$("modelStatus").textContent=state.serviceReady?"离线分析服务已准备好":"离线模型尚未就绪";$("modelStatus").style.color=state.serviceReady?"var(--accent-dark)":"var(--warm)";}catch(_){state.serviceReady=false;$("modelStatus").textContent="分析服务连接失败，请稍后刷新";$("modelStatus").style.color="#a53d35";}$("analyzeBtn").disabled=!(state.serviceReady&&state.file); }
+    function resetExperience() { closeShareStudio();if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=null;state.previewUrl=null;state.reportData=null;state.photoImage=null;state.shareIndex=0;$("appShell").removeAttribute("data-theme");$("photoInput").value="";$("previewImage").removeAttribute("src");$("resultThumb").removeAttribute("src");$("fileStatus").textContent="";$("analysisStatus").textContent="";$("analyzeBtn").disabled=true;setView("upload");window.scrollTo({top:0,behavior:"smooth"}); }
+    $("chooseBtn").addEventListener("click",()=>{$("photoInput").value="";$("photoInput").click();});
+    $("photoInput").addEventListener("change",(event)=>{const file=event.target.files[0];if(!file)return;if(!ALLOWED_FILE_TYPES.has(file.type)){$("fileStatus").textContent="仅支持 JPG、PNG 或 WebP 图片";return;}if(file.size>MAX_FILE_BYTES){$("fileStatus").textContent="图片不能超过 8 MB";return;}if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=file;state.previewUrl=URL.createObjectURL(file);state.photoImage=null;$("previewImage").src=state.previewUrl;$("fileName").textContent=file.name;$("analysisStatus").textContent=state.serviceReady?"照片已就绪，可以开始分析":"分析服务尚未连接，请稍候";$("analyzeBtn").disabled=!state.serviceReady;setView("preview");window.scrollTo({top:0,behavior:"smooth"});});
+    $("resetBtn").addEventListener("click",resetExperience);$("retestTopBtn").addEventListener("click",resetExperience);$("retestBottomBtn").addEventListener("click",resetExperience);
+    $("analyzeBtn").addEventListener("click",async()=>{if(!state.file||!state.serviceReady)return;const button=$("analyzeBtn");button.disabled=true;button.textContent="正在生成报告…";$("analysisStatus").textContent="正在检测面部关键点、照片条件与风格倾向";setView("analyzing");const form=new FormData();form.append("photo",state.file);const controller=new AbortController(),timeout=window.setTimeout(()=>controller.abort(),90000);try{const response=await fetch("api/analyze",{method:"POST",body:form,signal:controller.signal});const payload=await readResponse(response);if(!response.ok)throw new Error(payload.detail||"分析失败");renderReport(payload);}catch(error){const message=error.name==="AbortError"?"分析超时，请稍后重试":error.message;$("analysisStatus").textContent=`分析失败：${message}`;setView("preview");}finally{window.clearTimeout(timeout);button.disabled=!(state.serviceReady&&state.file);button.textContent="生成我的报告";}});
+    $("shareBtn").addEventListener("click",openShareStudio);$("closeShareBtn").addEventListener("click",closeShareStudio);$("prevCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex-1));$("nextCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex+1));$("hidePhotoToggle").addEventListener("change",drawShareCards);$("downloadCardBtn").addEventListener("click",downloadCurrentCard);$("downloadBtn").addEventListener("click",()=>window.print());$("shareModal").addEventListener("click",(event)=>{if(event.target===$("shareModal"))closeShareStudio();});document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&!$("shareModal").classList.contains("hidden"))closeShareStudio();});window.addEventListener("beforeunload",()=>{if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);});
+    setupShareDots();setView("upload");checkService();
+  </script>
+</body>
+</html>

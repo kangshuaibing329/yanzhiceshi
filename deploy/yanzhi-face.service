@@ -1,0 +1,29 @@
+[Unit]
+Description=Yanzhi Face Analysis Service
+After=network.target
+
+[Service]
+Type=simple
+User=yanzhi
+Group=yanzhi
+WorkingDirectory=/home/yanzhi/face-app/server
+Environment=MODEL_PATH=/home/yanzhi/face-app/server/models/face_landmarker.task
+Environment=INDEX_PATH=/home/yanzhi/face-app/index.html
+Environment=MPLCONFIGDIR=/tmp/matplotlib-yanzhi
+ExecStart=/home/yanzhi/face-app/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8812 --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryMax=1G
+CPUQuota=150%
+
+[Install]
+WantedBy=multi-user.target
