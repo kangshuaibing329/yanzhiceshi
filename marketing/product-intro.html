@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>面部风格分析系统｜商品介绍图</title>
+  <style>
+    :root {
+      --ink: #1d2b42;
+      --ink-2: #2c3a51;
+      --cream: #f7f3ed;
+      --paper: #fffdfa;
+      --teal: #258e8e;
+      --teal-soft: #e2f1ef;
+      --apricot: #e8b993;
+      --muted: #6f7c8e;
+      --line: #dfe7e8;
+      --shadow: 0 30px 80px rgba(32, 47, 68, .18);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #dbe5e5; }
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      color: var(--ink);
+      padding: 32px;
+    }
+    .board { display: grid; gap: 32px; justify-content: center; }
+    .slide {
+      width: 1080px;
+      height: 1440px;
+      position: relative;
+      overflow: hidden;
+      background: var(--cream);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+    .slide::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,255,255,.28), transparent 44%, rgba(31,47,68,.06));
+      z-index: 5;
+    }
+    .visual {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      opacity: .96;
+    }
+    .shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(247,243,237,.98) 0 46%, rgba(247,243,237,.60) 63%, rgba(247,243,237,.10) 100%); }
+    .shade-dark { background: linear-gradient(180deg, rgba(29,43,66,.98) 0 38%, rgba(29,43,66,.48) 69%, rgba(29,43,66,.90) 100%); }
+    .pad { padding: 76px 76px 70px; position: relative; z-index: 2; }
+    .eyebrow { margin: 0 0 24px; font-size: 22px; font-weight: 800; letter-spacing: .18em; color: var(--teal); }
+    .eyebrow.light { color: #b6e0dd; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 76px; line-height: 1.16; letter-spacing: -.055em; font-weight: 900; }
+    h2 { font-size: 54px; line-height: 1.18; letter-spacing: -.045em; font-weight: 900; }
+    h3 { font-size: 30px; line-height: 1.25; font-weight: 850; }
+    .sub { margin-top: 30px; font-size: 28px; line-height: 1.65; color: var(--muted); max-width: 690px; }
+    .tiny { font-size: 21px; line-height: 1.55; color: var(--muted); }
+    .rule { height: 1px; background: var(--line); margin: 34px 0; }
+    .pill { display: inline-flex; align-items: center; border-radius: 999px; background: var(--teal-soft); color: var(--teal); padding: 12px 20px; font-size: 21px; font-weight: 800; }
+    .pill.dark { background: rgba(255,255,255,.12); color: #f7f8f9; border: 1px solid rgba(255,255,255,.24); }
+    .footer { position: absolute; left: 76px; right: 76px; bottom: 58px; display: flex; justify-content: space-between; align-items: center; z-index: 3; }
+    .brand { font-size: 22px; font-weight: 900; letter-spacing: .08em; }
+    .page { font-size: 20px; color: var(--muted); letter-spacing: .12em; }
+    .dark-text { color: #fff; }
+    .dark-text .sub, .dark-text .tiny { color: rgba(255,255,255,.72); }
+    .dark-text .page { color: rgba(255,255,255,.58); }
+
+    /* 01 cover */
+    .cover .pad { padding-top: 100px; }
+    .cover h1 { max-width: 660px; }
+    .cover .hero-note { margin-top: 56px; padding-left: 24px; border-left: 5px solid var(--teal); max-width: 560px; }
+    .cover .hero-note strong { display: block; font-size: 28px; margin-bottom: 12px; }
+    .cover .hero-note p { font-size: 23px; line-height: 1.65; color: var(--muted); }
+    .cover .bottom-card { position: absolute; left: 76px; right: 76px; bottom: 158px; display: flex; gap: 16px; align-items: center; }
+    .cover .bottom-card span { padding: 16px 22px; border-radius: 18px; background: rgba(255,253,250,.84); border: 1px solid rgba(37,142,142,.18); font-size: 21px; font-weight: 800; }
+
+    /* 02 feature grid */
+    .features { background: var(--paper); }
+    .features .top { display: flex; justify-content: space-between; align-items: end; gap: 40px; }
+    .features .top .tiny { max-width: 260px; text-align: right; }
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 60px; }
+    .feature-card { min-height: 330px; border-radius: 30px; padding: 32px; background: #f4f8f7; border: 1px solid #d9e8e6; position: relative; overflow: hidden; }
+    .feature-card:nth-child(2) { background: #f7f1eb; border-color: #efdfd1; }
+    .feature-card:nth-child(3) { background: #eef1f7; border-color: #dce3ee; }
+    .feature-card:nth-child(4) { background: #f7f5ed; border-color: #eae4d1; }
+    .feature-no { font-size: 20px; color: var(--teal); font-weight: 900; letter-spacing: .12em; }
+    .feature-card h3 { margin-top: 68px; }
+    .feature-card p { margin-top: 14px; color: var(--muted); font-size: 22px; line-height: 1.55; }
+    .orb { position: absolute; right: -50px; top: -50px; width: 170px; height: 170px; border-radius: 50%; background: rgba(37,142,142,.11); }
+    .orb::after { content: ""; position: absolute; inset: 28px; border: 2px solid rgba(37,142,142,.35); border-radius: 50%; }
+    .method-strip { margin-top: 36px; padding: 26px 30px; border-radius: 22px; background: var(--ink); color: #fff; display: flex; gap: 24px; align-items: center; }
+    .method-strip strong { font-size: 24px; white-space: nowrap; }
+    .method-strip span { color: rgba(255,255,255,.72); font-size: 20px; line-height: 1.5; }
+
+    /* 03 style */
+    .style { background: var(--ink); color: #fff; }
+    .style .visual { opacity: .52; }
+    .style .pad { padding-top: 86px; }
+    .style h2 { max-width: 750px; }
+    .style-intro { margin-top: 32px; font-size: 25px; line-height: 1.6; color: rgba(255,255,255,.76); max-width: 700px; }
+    .style-tag { margin-top: 86px; display: flex; align-items: center; gap: 22px; }
+    .style-tag .tag { padding: 26px 36px; border-radius: 24px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.30); font-size: 40px; font-weight: 900; letter-spacing: -.04em; }
+    .style-tag .x { color: var(--apricot); font-size: 36px; font-weight: 900; }
+    .style-copy { margin-top: 34px; padding: 28px 32px; border-left: 4px solid var(--apricot); background: rgba(255,255,255,.09); max-width: 760px; }
+    .style-copy strong { display: block; font-size: 28px; margin-bottom: 10px; }
+    .style-copy p { font-size: 22px; line-height: 1.65; color: rgba(255,255,255,.72); }
+    .style-flow { position: absolute; left: 76px; right: 76px; bottom: 178px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .flow-item { padding: 24px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 22px; }
+    .flow-item b { color: #b6e0dd; font-size: 19px; }
+    .flow-item p { margin-top: 10px; color: rgba(255,255,255,.78); font-size: 20px; line-height: 1.5; }
+
+    /* 04 advice */
+    .advice { background: var(--cream); }
+    .advice .intro { display: flex; justify-content: space-between; align-items: end; gap: 40px; }
+    .advice .intro .tiny { max-width: 290px; text-align: right; }
+    .advice-list { display: grid; gap: 18px; margin-top: 54px; }
+    .advice-card { display: grid; grid-template-columns: 210px 1fr; gap: 26px; padding: 28px 30px; border-radius: 28px; background: #fffdfa; border: 1px solid var(--line); }
+    .advice-card:nth-child(1) { border-left: 7px solid var(--teal); }
+    .advice-card:nth-child(2) { border-left: 7px solid #d4a078; }
+    .advice-card:nth-child(3) { border-left: 7px solid #6f7ca5; }
+    .advice-card .num { color: var(--teal); font-size: 20px; font-weight: 900; letter-spacing: .12em; }
+    .advice-card h3 { margin-top: 48px; }
+    .advice-card .content strong { display: block; font-size: 24px; margin-bottom: 11px; }
+    .advice-card .content p { font-size: 21px; line-height: 1.55; color: var(--muted); }
+    .advice-card .do { margin-top: 18px; padding-top: 16px; border-top: 1px dashed #d8e1e1; color: var(--teal); font-size: 20px; font-weight: 800; }
+    .cta { margin-top: 38px; padding: 26px 30px; border-radius: 24px; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .cta strong { font-size: 24px; }
+    .cta span { font-size: 20px; color: rgba(255,255,255,.78); }
+
+    /* 05 trust */
+    .trust { background: #edf3f2; }
+    .trust .visual { opacity: .22; object-position: 70% 50%; }
+    .trust .pad { padding-top: 90px; }
+    .trust h2 { max-width: 670px; }
+    .trust-grid { margin-top: 58px; display: grid; gap: 18px; max-width: 760px; }
+    .trust-item { padding: 26px 30px; border-radius: 24px; background: rgba(255,253,250,.85); border: 1px solid #d9e5e2; display: grid; grid-template-columns: 64px 1fr; gap: 18px; align-items: start; }
+    .trust-icon { width: 56px; height: 56px; border-radius: 18px; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; font-size: 26px; font-weight: 900; }
+    .trust-item strong { display: block; font-size: 25px; margin-top: 2px; }
+    .trust-item p { margin-top: 8px; color: var(--muted); font-size: 20px; line-height: 1.55; }
+    .trust-bottom { position: absolute; left: 76px; right: 76px; bottom: 166px; padding: 30px 34px; border-radius: 28px; background: var(--ink); color: #fff; }
+    .trust-bottom strong { display: block; font-size: 29px; }
+    .trust-bottom p { margin-top: 10px; font-size: 21px; line-height: 1.55; color: rgba(255,255,255,.72); }
+    .trust-bottom .button { margin-top: 20px; display: inline-block; padding: 13px 22px; border-radius: 999px; background: var(--apricot); color: var(--ink); font-size: 20px; font-weight: 900; }
+
+    @media (max-width: 1150px) {
+      body { padding: 0; }
+      .board { display: block; }
+      .slide { transform-origin: top left; transform: scale(calc((100vw) / 1080)); margin-bottom: calc(-1440px + 1440px * (100vw / 1080)); box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <section class="slide cover" id="slide-01">
+      <img class="visual" src="assets/analysis-visual.png" alt="" />
+      <div class="shade"></div>
+      <div class="pad">
+        <p class="eyebrow">FACE STYLE REPORT · 01</p>
+        <h1>一张照片，<br />找到你的<br />风格优势</h1>
+        <p class="sub">不是给你贴“好看 / 不好看”的标签，而是把面部比例、照片状态和风格倾向，整理成一份能看懂、能执行的报告。</p>
+        <div class="hero-note">
+          <strong>看见风格，不定义美丑</strong>
+          <p>上传一张正脸照片，生成你的风格标签、视觉观察和妆发穿搭建议。</p>
+        </div>
+      </div>
+      <div class="bottom-card"><span>面部风格分析</span><span>妆发穿搭建议</span><span>3:4 报告图可保存</span></div>
+      <div class="footer"><span class="brand">颜值 · 风格观察</span><span class="page">01 / 05</span></div>
+    </section>
+
+    <section class="slide features" id="slide-02">
+      <div class="pad">
+        <div class="top"><div><p class="eyebrow">WHAT YOU GET · 02</p><h2>不只给你一个分数</h2></div><p class="tiny">把“我适合什么”拆成四个更容易理解的观察面。</p></div>
+        <div class="rule"></div>
+        <div class="feature-grid">
+          <article class="feature-card"><i class="orb"></i><span class="feature-no">01 · FEATURE</span><h3>五官协调</h3><p>看眉眼、鼻唇之间的相对比例和视觉重量，找到妆容重点。</p></article>
+          <article class="feature-card"><i class="orb"></i><span class="feature-no">02 · STRUCTURE</span><h3>轮廓骨相</h3><p>观察面部纵横关系与线条感，辅助判断发型的修饰方向。</p></article>
+          <article class="feature-card"><i class="orb"></i><span class="feature-no">03 · LIGHT</span><h3>光影质感</h3><p>把曝光、对比和清晰度单独说清楚，不把拍照条件误当成颜值。</p></article>
+          <article class="feature-card"><i class="orb"></i><span class="feature-no">04 · CAMERA</span><h3>上镜表现</h3><p>结合面部朝向和画面状态，告诉你这次结果的参考度。</p></article>
+        </div>
+        <div class="method-strip"><strong>一份报告，四个观察面</strong><span>结果来自面部关键点与相对比例规则，不调用第三方大模型 API。</span></div>
+      </div>
+      <div class="footer"><span class="brand">颜值 · 风格观察</span><span class="page">02 / 05</span></div>
+    </section>
+
+    <section class="slide style" id="slide-03">
+      <img class="visual" src="assets/analysis-visual.png" alt="" />
+      <div class="shade shade-dark"></div>
+      <div class="pad dark-text">
+        <p class="eyebrow light">STYLE LABEL · 03</p>
+        <h2>你的风格，不必被一个词限制</h2>
+        <p class="style-intro">系统会根据这张照片里的面部比例、线条感、五官存在感与整体平衡，给出“主风格 × 次风格”的模糊标签。</p>
+        <div class="style-tag"><span class="tag">清冷感</span><span class="x">×</span><span class="tag">氛围感</span></div>
+        <div class="style-copy"><strong>这是方向，不是定论</strong><p>你的结果可能随着光线、表情和造型变化。标签的作用，是帮你更快找到适合自己的尝试方向。</p></div>
+      </div>
+      <div class="style-flow"><div class="flow-item"><b>01 · 识别</b><p>从照片中提取面部关键点</p></div><div class="flow-item"><b>02 · 归纳</b><p>比较比例与视觉倾向</p></div><div class="flow-item"><b>03 · 转译</b><p>变成妆发穿搭语言</p></div></div>
+      <div class="footer dark-text"><span class="brand">颜值 · 风格观察</span><span class="page">03 / 05</span></div>
+    </section>
+
+    <section class="slide advice" id="slide-04">
+      <div class="pad">
+        <div class="intro"><div><p class="eyebrow">STYLE FORMULA · 04</p><h2>报告给你的，是下一步</h2></div><p class="tiny">不用一次改变全部，只先做一个小调整。</p></div>
+        <div class="advice-list">
+          <article class="advice-card"><div><span class="num">01 · MAKEUP</span><h3>化妆建议</h3></div><div class="content"><strong>单点强调，保留面部呼吸感</strong><p>从眉形、眼妆、腮红和唇色里找到一个视觉中心，避免每个区域都抢重点。</p><div class="do">今天就做：先完成轻薄底妆，再只加强一个区域。</div></div></article>
+          <article class="advice-card"><div><span class="num">02 · HAIR</span><h3>发型建议</h3></div><div class="content"><strong>用层次和弧度修饰轮廓</strong><p>根据面部纵横关系，给出侧分、层次、蓬松度和脸周线条的尝试方向。</p><div class="do">今天就做：同一光线下拍两张不同分缝，直接对比。</div></div></article>
+          <article class="advice-card"><div><span class="num">03 · OUTFIT</span><h3>日常搭配</h3></div><div class="content"><strong>让颜色、材质和气质保持一致</strong><p>从低饱和、柔和浅色、明确主色或同色系层次中，选一条适合你的搭配路径。</p><div class="do">今天就做：先确定一件主单品，其余用基础色收住。</div></div></article>
+        </div>
+        <div class="cta"><strong>报告不是结论，是你的试错清单</strong><span>看完就知道下一次可以怎么拍、怎么画、怎么穿。</span></div>
+      </div>
+      <div class="footer"><span class="brand">颜值 · 风格观察</span><span class="page">04 / 05</span></div>
+    </section>
+
+    <section class="slide trust" id="slide-05">
+      <img class="visual" src="assets/analysis-visual.png" alt="" />
+      <div class="pad">
+        <p class="eyebrow">WHY THIS REPORT · 05</p>
+        <h2>更轻松，也更安心地认识自己的风格</h2>
+        <div class="trust-grid">
+          <article class="trust-item"><div class="trust-icon">⌁</div><div><strong>离线模型分析</strong><p>使用本站服务器上的 MediaPipe Face Landmarker，不依赖第三方大模型 API。</p></div></article>
+          <article class="trust-item"><div class="trust-icon">↗</div><div><strong>照片条件单独说明</strong><p>曝光、清晰度和面部角度会影响结果，报告会把“照片问题”和“风格观察”分开。</p></div></article>
+          <article class="trust-item"><div class="trust-icon">○</div><div><strong>不做身份识别</strong><p>原图仅用于本次分析，不持久化保存；结果也不是医学判断、人群排名或客观颜值结论。</p></div></article>
+        </div>
+      </div>
+      <div class="trust-bottom"><strong>准备好看看自己的风格了吗？</strong><p>上传一张自然光、无遮挡、单人正脸照片，生成一份可以保存、可以分享、也可以照着执行的视觉观察报告。</p><span class="button">上传照片 · 开始分析</span></div>
+      <div class="footer"><span class="brand">颜值 · 风格观察</span><span class="page">05 / 05</span></div>
+    </section>
+  </main>
+  <script>
+    const slideNumber = Number(new URLSearchParams(location.search).get("slide"));
+    if (slideNumber >= 1 && slideNumber <= 5) {
+      document.querySelectorAll(".slide").forEach((slide, index) => {
+        slide.style.display = index + 1 === slideNumber ? "block" : "none";
+      });
+      document.body.style.padding = "0";
+    }
+  </script>
+</body>
+</html>
