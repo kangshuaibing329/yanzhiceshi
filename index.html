@@ -13,7 +13,7 @@
       --warm:#a46b34; --warm-soft:#fbf0e3; --shadow:0 16px 50px #26334812;
     }
     * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
+    html { scroll-behavior:smooth; scroll-padding-top:18px; }
     body { margin:0; background:#e9e6e1; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; -webkit-font-smoothing:antialiased; }
     body.modal-open { overflow:hidden; }
     button,input { font:inherit; }
@@ -37,6 +37,9 @@
     .intro { position:relative; overflow:hidden; padding:38px 30px 34px; margin-bottom:16px; }
     .intro::after { content:""; position:absolute; width:180px; height:180px; right:-74px; top:-78px; border-radius:50%; background:var(--accent-soft); opacity:.75; }
     .intro .muted { position:relative; z-index:1; max-width:490px; margin-bottom:0; }
+    .deliverables { position:relative; z-index:1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; margin:20px 0 0; padding:0; list-style:none; }
+    .deliverables li { padding:9px 10px; border:1px solid #e6ded8; border-radius:11px; background:#ffffffb8; color:var(--muted); font-size:11px; line-height:1.45; }
+    .deliverables li::before { content:"✓"; margin-right:5px; color:var(--accent); font-weight:900; }
     .upload { padding:35px 26px 29px; border:1.5px dashed #c8aaa5; text-align:center; }
     .upload-icon { width:60px; height:60px; margin:0 auto 16px; display:grid; place-items:center; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:32px; font-weight:300; }
     .upload h2 { margin-bottom:8px; font-size:21px; }
@@ -69,9 +72,12 @@
     .score-line { display:flex; align-items:flex-end; gap:8px; margin:10px 0 5px; }
     .score { color:var(--navy); font-family:Georgia,serif; font-size:82px; font-weight:400; line-height:.88; letter-spacing:-5px; }
     .score-unit { padding-bottom:8px; color:var(--muted); font-size:13px; }
+    .score-note { margin:0 0 9px; color:var(--muted); font-size:10px; line-height:1.5; }
     .score-label { margin:13px 0 8px; font-family:Georgia,"Songti SC","SimSun",serif; font-size:25px; line-height:1.35; }
     .combo-name { margin:15px 0 4px; color:var(--accent-dark); font-size:24px; font-weight:900; letter-spacing:-.5px; }
     .identity-line { margin:0 0 9px; color:var(--ink); font-size:13px; font-weight:750; }
+    .style-tendency { margin:0 0 5px; color:var(--accent-dark); font-size:11px; font-weight:850; }
+    .style-description { margin:0 0 10px; font-size:12px; line-height:1.65; }
     .result-summary { margin-bottom:14px; }
     .style-pill,.soft-pill,.tag { display:inline-flex; align-items:center; min-height:28px; padding:5px 11px; border-radius:99px; font-size:11px; line-height:1.35; }
     .style-pill { background:var(--navy); color:#fff; font-weight:800; }
@@ -87,6 +93,11 @@
     .share-cta small { display:block; margin-top:4px; color:#cbd1da; font-size:11px; }
     .share-cta button { min-height:40px; padding:0 16px; border:0; border-radius:11px; background:#fff; color:var(--navy); cursor:pointer; font-size:12px; font-weight:850; }
     .top-retest { position:relative; z-index:1; margin-top:14px; padding:0; }
+    .report-map { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding:11px; box-shadow:none; }
+    .report-map::-webkit-scrollbar { display:none; }
+    .report-map { scrollbar-width:none; }
+    .report-map a { padding:8px 10px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); font-size:11px; font-weight:800; text-decoration:none; }
+    .report-map a:focus-visible { outline:3px solid #9c5d5545; outline-offset:2px; }
 
     .report-section { margin-top:30px; }
     .section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin:0 5px 12px; }
@@ -110,6 +121,8 @@
     .advice-grid { display:grid; gap:12px; }
     .advice-card { padding:21px; }
     .advice-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    .advice-card > summary { margin-bottom:0; }
+    .advice-card[open] > summary { margin-bottom:14px; }
     .advice-head strong { font-family:Georgia,"Songti SC","SimSun",serif; font-size:19px; }
     .advice-head em { color:var(--accent); font-size:11px; font-style:normal; font-weight:850; }
     .advice-body { display:grid; grid-template-columns:1.25fr 1fr 1.15fr; gap:12px; }
@@ -120,6 +133,10 @@
     .advice-item p { margin:0; color:var(--muted); font-size:12px; line-height:1.68; }
     .analysis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .analysis-card { padding:20px; }
+    .analysis-card summary,.advice-card summary { list-style:none; cursor:pointer; }
+    .analysis-card summary::-webkit-details-marker,.advice-card summary::-webkit-details-marker { display:none; }
+    .analysis-card summary::after,.advice-card summary::after { content:"＋"; color:var(--accent); font-size:18px; font-weight:400; }
+    .analysis-card[open] summary::after,.advice-card[open] summary::after { content:"−"; }
     .analysis-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
     .analysis-head strong { font-size:15px; }
     .mini-score { color:var(--accent-dark); font-size:19px; font-weight:850; }
@@ -169,6 +186,12 @@
       .hero-metrics,.share-cta { grid-column:1/-1; }
       .insight-grid,.analysis-grid { grid-template-columns:1fr; }
       .advice-body { grid-template-columns:1fr; }
+      .report-map { position:sticky; top:8px; z-index:4; overflow:auto; flex-wrap:nowrap; margin-inline:-2px; background:#fffdf9e8; backdrop-filter:blur(10px); }
+      .report-map a { flex:0 0 auto; }
+      .analysis-card,.advice-card { padding:16px; }
+      .analysis-card:not([open]),.advice-card:not([open]) { padding-bottom:16px; }
+      .analysis-card summary,.advice-card summary { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .analysis-card .analysis-copy,.advice-card .advice-body { margin-top:13px; }
     }
     @media (min-width:701px) {
       .app-shell { margin:20px auto; min-height:calc(100vh - 40px); border-radius:25px; }
@@ -188,7 +211,7 @@
     @media print {
       body,.app-shell { background:#fff; box-shadow:none; }
       .app-shell { width:100%; margin:0; padding:0; }
-      .topbar,.intro,.upload,.preview,.report-actions,.top-retest,.share-cta,.share-modal { display:none !important; }
+      .topbar,.intro,.upload,.preview,.report-actions,.top-retest,.share-cta,.share-modal,.report-map { display:none !important; }
       .report { display:block !important; }
       .card,.report-section { box-shadow:none; break-inside:avoid; }
     }
@@ -198,23 +221,31 @@
   <main class="app-shell" id="appShell">
     <header class="topbar">
       <strong id="topbarTitle">面部风格分析</strong>
-      <small id="topbarSubtitle">离线模型 · 照片仅用于本次分析</small>
+      <small id="topbarSubtitle">本站本地模型 · 照片仅用于本次分析</small>
     </header>
 
     <section class="intro card" id="introCard">
       <p class="eyebrow">FACE STYLE REPORT</p>
       <h1>不定义美丑，<br />只找到你的风格优势</h1>
-      <p class="muted">从面部关键点、比例关系、照片条件与风格倾向四个层面，生成一份有依据、能落地的视觉观察报告。</p>
+      <p class="muted">生成照片呈现分、风格标签、面部关系观察，以及妆容、发型和日常搭配建议。</p>
+      <ul class="deliverables" aria-label="报告包含内容">
+        <li>照片呈现分与参考度</li>
+        <li>主风格与混合倾向</li>
+        <li>五官与轮廓观察</li>
+        <li>5张小红书分享图</li>
+      </ul>
     </section>
 
     <section class="upload card" id="uploadCard">
       <div class="upload-icon" aria-hidden="true">＋</div>
       <h2>上传一张正脸照片</h2>
-      <p class="muted upload-copy">自然光、无遮挡、少滤镜、单人正脸效果更稳定<br />支持 JPG、PNG、WebP，最大 8 MB</p>
+      <p class="muted upload-copy">自然光、无遮挡、少滤镜、单人正脸效果更稳定<br />支持 JPG、PNG、WebP，最大 8 MB；暂不支持 HEIC</p>
       <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
       <button class="primary-btn" id="chooseBtn" type="button">选择照片</button>
       <p class="status" id="fileStatus" role="status" aria-live="polite"></p>
       <p class="status" id="modelStatus" role="status" aria-live="polite">正在连接分析服务…</p>
+      <button class="text-btn hidden" id="retryServiceBtn" type="button">重新连接分析服务</button>
+      <p class="status privacy-note">照片会上传至本站服务器，由本站本地模型处理；不调用第三方大模型，分析完成后不持久化保存。</p>
     </section>
 
     <section class="preview card hidden" id="previewCard">
@@ -232,11 +263,14 @@
         <div class="hero-layout">
           <div class="result-photo"><img id="resultThumb" alt="本次分析照片" /></div>
           <div class="result-copy">
-            <p class="eyebrow">你的本次照片报告</p>
+            <p class="eyebrow">本次照片呈现分</p>
             <div class="score-line"><span class="score" id="totalScore">—</span><span class="score-unit">/ 10</span></div>
+            <p class="score-note">仅描述当前照片 · 实验性呈现量表</p>
             <h2 class="score-label" id="scoreLabel">正在生成结论</h2>
             <h3 class="combo-name" id="comboName">—</h3>
+            <p class="style-tendency" id="styleTendency"></p>
             <p class="identity-line" id="identityLine"></p>
+            <p class="muted style-description" id="styleDescription"></p>
             <p class="muted result-summary" id="scoreNote"></p>
             <div class="tag-row" id="styleTags"></div>
           </div>
@@ -252,28 +286,36 @@
         </div>
       </section>
 
-      <section class="report-section">
+      <nav class="report-map card" aria-label="报告章节导航">
+        <a href="#snapshotSection">核心观察</a>
+        <a href="#findingsSection">记忆点</a>
+        <a href="#formulaSection">风格公式</a>
+        <a href="#detailsSection">详细依据</a>
+        <a href="#referenceSection">照片参考度</a>
+      </nav>
+
+      <section class="report-section" id="snapshotSection">
         <div class="section-heading"><div><p>01 · SNAPSHOT</p><h2>四项核心观察</h2></div><small>分数只描述当前照片</small></div>
         <div class="dimension-card card" id="dimensionOverview"></div>
       </section>
 
-      <section class="report-section">
+      <section class="report-section" id="findingsSection">
         <div class="section-heading"><div><p>02 · KEY FINDINGS</p><h2>先看最值得记住的三点</h2></div><small>两项优势，一个优先动作</small></div>
         <div class="insight-grid" id="insightGrid"></div>
       </section>
 
-      <section class="report-section">
-        <div class="section-heading"><div><p>03 · STYLE FORMULA</p><h2>你的显美公式</h2></div><small>妆容、发型、日常搭配</small></div>
+      <section class="report-section" id="formulaSection">
+        <div class="section-heading"><div><p>03 · STYLE FORMULA</p><h2>你的风格公式</h2></div><small>妆容、发型、日常搭配</small></div>
         <div class="advice-grid" id="adviceGrid"></div>
       </section>
 
-      <section class="report-section">
-        <div class="section-heading"><div><p>04 · DETAILS</p><h2>五官、骨相与皮相观察</h2></div><small>观察依据与建议分开呈现</small></div>
+      <section class="report-section" id="detailsSection">
+        <div class="section-heading"><div><p>04 · DETAILS</p><h2>面部关系与照片质感</h2></div><small>观察依据与建议分开呈现</small></div>
         <div class="analysis-grid" id="analysisGrid"></div>
       </section>
 
-      <section class="report-section">
-        <div class="section-heading"><div><p>05 · PHOTO REFERENCE</p><h2>本次照片参考度</h2></div><small>不把拍照问题当成颜值问题</small></div>
+      <section class="report-section" id="referenceSection">
+        <div class="section-heading"><div><p>05 · PHOTO REFERENCE</p><h2>本次照片参考度</h2></div><small>不把照片条件当成面部特征</small></div>
         <div class="photo-check card" id="photoCheck">
           <div class="check-head"><strong>照片条件检查</strong><span class="check-state" id="photoCheckTitle">—</span></div>
           <p class="muted" id="photoCheckMessage"></p>
@@ -285,6 +327,7 @@
         <strong>结果边界与隐私说明</strong>
         <p id="methodNotice">本报告只观察当前照片中的可见视觉特征，不代表固定颜值或人群排名。</p>
         <p id="methodMetrics"></p>
+        <p id="methodCalibration"></p>
         <p>照片通过 HTTPS 发送至本站服务器上的离线模型，处理后不做持久化保存；本工具不用于身份识别、医疗判断或现实价值评价。</p>
       </section>
 
@@ -295,16 +338,17 @@
     </section>
   </main>
 
-  <div class="share-modal hidden" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareDialogTitle">
+  <div class="share-modal hidden" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareDialogTitle" aria-describedby="shareDialogHint">
     <section class="share-dialog">
       <header class="share-head">
         <div><strong id="shareDialogTitle">小红书报告图</strong><small>5 张 · 1080 × 1440 · 3:4</small></div>
         <button class="icon-btn" id="closeShareBtn" type="button" aria-label="关闭">×</button>
       </header>
       <div class="share-options">
-        <label class="privacy-toggle"><input id="hidePhotoToggle" type="checkbox" /> 隐藏本人照片再分享</label>
+        <label class="privacy-toggle"><input id="hidePhotoToggle" type="checkbox" checked /> 隐藏本人照片再分享</label>
         <span id="cardCounter">1 / 5</span>
       </div>
+      <p class="hidden" id="shareDialogHint">默认隐藏本人照片；可左右切换 5 张报告图，支持下载或调用系统分享。</p>
       <div class="canvas-stage" id="canvasStage">
         <canvas class="share-card-canvas active" width="1080" height="1440" aria-label="分享图第1张"></canvas>
         <canvas class="share-card-canvas" width="1080" height="1440" aria-label="分享图第2张"></canvas>
@@ -323,7 +367,7 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { file:null, previewUrl:null, serviceReady:false, view:"upload", reportData:null, shareIndex:0, photoImage:null };
+    const state = { file:null, previewUrl:null, serviceReady:false, view:"upload", reportData:null, shareIndex:0, photoImage:null, previousFocus:null };
     const MAX_FILE_BYTES = 8 * 1024 * 1024;
     const ALLOWED_FILE_TYPES = new Set(["image/jpeg","image/png","image/webp"]);
     const shareCanvases = [...document.querySelectorAll(".share-card-canvas")];
@@ -340,7 +384,7 @@
       state.view=view; const isUpload=view==="upload"; const isPreview=view==="preview"||view==="analyzing"; const isReport=view==="report";
       $("introCard").classList.toggle("hidden",!isUpload); $("uploadCard").classList.toggle("hidden",!isUpload); $("previewCard").classList.toggle("hidden",!isPreview); $("report").classList.toggle("hidden",!isReport);
       $("appShell").classList.toggle("result-mode",isReport); $("previewCard").classList.toggle("is-loading",view==="analyzing");
-      $("topbarTitle").textContent=isReport?"你的面部风格报告":"面部风格分析"; $("topbarSubtitle").textContent=isReport?"当前照片视觉观察 · 不是固定颜值结论":"离线模型 · 照片仅用于本次分析";
+      $("topbarTitle").textContent=isReport?"你的面部风格报告":"面部风格分析"; $("topbarSubtitle").textContent=isReport?"当前照片视觉观察 · 不是固定颜值结论":"本站本地模型 · 照片仅用于本次分析";
     }
     function renderDimensions(sections) {
       const container=$("dimensionOverview"); clearChildren(container);
@@ -348,20 +392,20 @@
     }
     function renderInsights(data) {
       const container=$("insightGrid"); clearChildren(container);
-      data.highlights.forEach((item,index)=>{ const card=make("article","insight-card card"); card.append(make("span","insight-label",`优势 0${index+1}`),make("h3","",item.title),make("p","",item.text)); container.appendChild(card); });
-      const improvement=make("article","insight-card improve card"); improvement.id="improvementCard"; improvement.append(make("span","insight-label","优先动作"),make("h3","",data.improvement.title),make("p","",data.improvement.text)); container.appendChild(improvement);
+      data.highlights.forEach((item,index)=>{ const card=make("article","insight-card card"); card.append(make("span","insight-label",`本次呈现较强 0${index+1}`),make("h3","",item.title),make("p","",item.text)); container.appendChild(card); });
+      const improvement=make("article","insight-card improve card"); improvement.id="improvementCard"; improvement.append(make("span","insight-label","优先尝试"),make("h3","",data.improvement.title),make("p","",data.improvement.text)); container.appendChild(improvement);
     }
     function renderAnalysis(sections) {
       const container=$("analysisGrid"); clearChildren(container);
-      sections.forEach((item)=>{ const card=make("article","analysis-card card"); const head=make("div","analysis-head"); head.append(make("strong","",item.name),make("span","mini-score",item.score.toFixed(1))); const observation=make("p"); observation.append(make("b","","观察："),document.createTextNode(item.observation)); const evidence=make("p","evidence"); evidence.append(make("b","","依据："),document.createTextNode(item.evidence)); const suggestion=make("p"); suggestion.append(make("b","","建议："),document.createTextNode(item.suggestion)); card.append(head,observation,evidence,suggestion); container.appendChild(card); });
+      sections.forEach((item)=>{ const card=make("details","analysis-card card"); card.open=window.matchMedia("(min-width:701px)").matches; const head=make("summary","analysis-head"); head.append(make("strong","",item.name),make("span","mini-score",item.score.toFixed(1))); const copy=make("div","analysis-copy"); const observation=make("p"); observation.append(make("b","","观察："),document.createTextNode(item.observation)); const evidence=make("p","evidence"); evidence.append(make("b","","依据："),document.createTextNode(item.evidence)); const suggestion=make("p"); suggestion.append(make("b","","建议："),document.createTextNode(item.suggestion)); copy.append(observation,evidence,suggestion); card.append(head,copy); container.appendChild(card); });
     }
     function renderAdvice(items) {
       const container=$("adviceGrid"); clearChildren(container);
-      items.forEach((item,index)=>{ const card=make("article","advice-card card"); const head=make("div","advice-head"); head.append(make("strong","",`${String(index+1).padStart(2,"0")} · ${item.title}`),make("em","",item.label)); const body=make("div","advice-body"); [["advice-item","适合",item.text],["advice-item avoid","尽量避免",item.avoid],["advice-item action","今天就能做",item.action]].forEach(([className,label,value])=>{ const block=make("div",className); block.append(make("b","",label),make("p","",value)); body.appendChild(block); }); card.append(head,body); container.appendChild(card); });
+      items.forEach((item,index)=>{ const card=make("details","advice-card card"); card.open=window.matchMedia("(min-width:701px)").matches||index===0; const head=make("summary","advice-head"); head.append(make("strong","",`${String(index+1).padStart(2,"0")} · ${item.title}`),make("em","",item.label)); const body=make("div","advice-body"); [["advice-item","适合",item.text],["advice-item avoid","尽量避免",item.avoid],["advice-item action","今天就能做",item.action]].forEach(([className,label,value])=>{ const block=make("div",className); block.append(make("b","",label),make("p","",value)); body.appendChild(block); }); card.append(head,body); container.appendChild(card); });
     }
     function renderReport(data) {
-      state.reportData=data; $("appShell").dataset.theme=data.style.name; $("resultThumb").src=state.previewUrl; $("totalScore").textContent=data.score.toFixed(1); $("scoreLabel").textContent=data.score_label; $("comboName").textContent=data.style.combo_name; $("identityLine").textContent=data.style.identity; $("scoreNote").textContent=data.summary; $("featureScore").textContent=`${data.overview.feature_score.toFixed(1)} / 10`; $("photoScore").textContent=data.photo_check.reference;
-      appendTags($("styleTags"),data.style.tags); $("photoCheck").classList.toggle("warn",data.photo_check.tone==="warn"); $("photoCheckTitle").textContent=data.photo_check.status; $("photoCheckMessage").textContent=data.photo_check.message; appendTags($("photoCheckTags"),data.photo_check.tags); renderDimensions(data.sections); renderInsights(data); renderAdvice(data.advice); renderAnalysis(data.sections); $("methodNotice").textContent=data.method.notice; $("methodMetrics").textContent=`分析依据：${data.method.metrics}。模型：${data.method.model}。`; setView("report"); window.scrollTo({top:0,behavior:"smooth"});
+      state.reportData=data; $("appShell").dataset.theme=data.style.name; $("resultThumb").src=state.previewUrl; $("totalScore").textContent=data.score.toFixed(1); $("scoreLabel").textContent=data.score_label; $("comboName").textContent=data.style.combo_name; $("styleTendency").textContent=`${data.style.tendency} · ${data.style.signal}`; $("identityLine").textContent=data.style.identity; $("styleDescription").textContent=data.style.description; $("scoreNote").textContent=data.summary; $("featureScore").textContent=`${data.overview.feature_score.toFixed(1)} / 10`; $("photoScore").textContent=data.photo_check.reference;
+      appendTags($("styleTags"),data.style.tags); $("photoCheck").classList.toggle("warn",data.photo_check.tone==="warn"); $("photoCheckTitle").textContent=data.photo_check.status; $("photoCheckMessage").textContent=data.photo_check.message; appendTags($("photoCheckTags"),data.photo_check.tags); renderDimensions(data.sections); renderInsights(data); renderAdvice(data.advice); renderAnalysis(data.sections); $("methodNotice").textContent=data.method.notice; $("methodMetrics").textContent=`分析依据：${data.method.metrics}。模型：${data.method.model}。`; $("methodCalibration").textContent=data.method.calibration||"当前结果是规则型实验输出，适合做风格探索，不适合做人与人之间的排名。"; setView("report"); window.scrollTo({top:0,behavior:"smooth"});
     }
 
     function paletteFor(styleName) {
@@ -381,26 +425,26 @@
       let ctx=shareCanvases[0].getContext("2d");cardBase(ctx,p,1,"我的风格答案");
       if(!hide&&state.photoImage)drawCoverImage(ctx,state.photoImage,72,135,936,565,42);else{roundedRect(ctx,72,135,936,565,42,p.paper,p.soft);ctx.fillStyle=p.soft;ctx.beginPath();ctx.arc(540,410,175,0,Math.PI*2);ctx.fill();text(ctx,"MY STYLE",540,376,54,p.accent,"800","center",'Georgia,"Times New Roman",serif');text(ctx,"已隐藏本人照片",540,452,24,p.ink,"600","center");}
       roundedRect(ctx,790,620,170,122,28,p.accent);text(ctx,data.score.toFixed(1),875,632,70,"#fff","700","center",'Georgia,"Times New Roman",serif');text(ctx,"/ 10",875,704,20,"#fff","600","center");text(ctx,"我测出来是",72,774,31,p.ink,"650");wrapped(ctx,`「${data.style.combo_name}」`,72,824,920,70,84,p.accent,"850",2);text(ctx,data.style.identity,72,1015,32,p.ink,"750");wrapped(ctx,data.style.share_line,72,1070,900,27,42,p.ink,"500",3);let px=72;data.share.keywords.forEach((tag)=>{px+=pill(ctx,tag,px,1225,p)+12;});
-      ctx=shareCanvases[1].getContext("2d");cardBase(ctx,p,2,"四项核心观察");text(ctx,"这张照片里的",72,154,32,p.ink,"600");text(ctx,"颜值呈现报告",72,202,66,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');text(ctx,data.score.toFixed(1),890,155,118,p.accent,"700","center",'Georgia,"Times New Roman",serif');text(ctx,"综合呈现分",890,282,22,p.ink,"600","center");roundedRect(ctx,72,350,936,725,40,p.paper,p.soft);data.sections.forEach((item,index)=>metricBar(ctx,item.name,item.score,126,420+index*145,828,p));roundedRect(ctx,72,1115,936,142,30,p.accent);text(ctx,data.style.combo_name,112,1143,42,"#fff","850");wrapped(ctx,data.style.identity,112,1202,820,24,34,"#fff","550",2);
-      ctx=shareCanvases[2].getContext("2d");cardBase(ctx,p,3,"优势与提升点");text(ctx,"最值得记住的",72,154,32,p.ink,"600");text(ctx,"两个优势，一个动作",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');insightBox(ctx,"优势 01",data.highlights[0].title,data.highlights[0].text,72,340,936,248,p);insightBox(ctx,"优势 02",data.highlights[1].title,data.highlights[1].text,72,620,936,248,p);insightBox(ctx,"优先动作",data.improvement.title,data.improvement.text,72,900,936,276,p,true);wrapped(ctx,"你不需要同时改变所有地方。先做最小的一步，再用同光线照片前后对比。",72,1214,910,24,36,p.ink,"550",3);
+      ctx=shareCanvases[1].getContext("2d");cardBase(ctx,p,2,"四项核心观察");text(ctx,"这张照片里的",72,154,32,p.ink,"600");text(ctx,"照片风格报告",72,202,66,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');text(ctx,data.score.toFixed(1),890,155,118,p.accent,"700","center",'Georgia,"Times New Roman",serif');text(ctx,"综合呈现分",890,282,22,p.ink,"600","center");roundedRect(ctx,72,350,936,725,40,p.paper,p.soft);data.sections.forEach((item,index)=>metricBar(ctx,item.name,item.score,126,420+index*145,828,p));roundedRect(ctx,72,1115,936,142,30,p.accent);text(ctx,data.style.combo_name,112,1143,42,"#fff","850");wrapped(ctx,data.style.identity,112,1202,820,24,34,"#fff","550",2);
+      ctx=shareCanvases[2].getContext("2d");cardBase(ctx,p,3,"突出点与行动");text(ctx,"最值得记住的",72,154,32,p.ink,"600");text(ctx,"两个突出点，一个动作",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');insightBox(ctx,"呈现较强 01",data.highlights[0].title,data.highlights[0].text,72,340,936,248,p);insightBox(ctx,"呈现较强 02",data.highlights[1].title,data.highlights[1].text,72,620,936,248,p);insightBox(ctx,"优先尝试",data.improvement.title,data.improvement.text,72,900,936,276,p,true);wrapped(ctx,"你不需要同时改变所有地方。先做最小的一步，再用同光线照片前后对比。",72,1214,910,24,36,p.ink,"550",3);
       ctx=shareCanvases[3].getContext("2d");cardBase(ctx,p,4,"妆发公式");text(ctx,"适合你的",72,154,32,p.ink,"600");text(ctx,"妆容 × 发型公式",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');[data.advice[0],data.advice[1]].forEach((item,index)=>{const y=350+index*430;roundedRect(ctx,72,y,936,388,36,p.paper,p.soft);text(ctx,`${String(index+1).padStart(2,"0")} · ${item.title}`,112,y+38,36,p.accent,"850");text(ctx,"适合",112,y+102,22,p.ink,"800");wrapped(ctx,item.text,112,y+140,836,24,38,p.ink,"500",4);roundedRect(ctx,112,y+286,836,70,18,p.soft);text(ctx,"先做：",136,y+306,22,p.accent,"800");wrapped(ctx,item.action,220,y+303,700,20,30,p.ink,"550",2);});text(ctx,"关键词",72,1240,22,p.ink,"700");let p4x=180;data.share.keywords.forEach((tag)=>{p4x+=pill(ctx,tag,p4x,1222,p)+12;});
       ctx=shareCanvases[4].getContext("2d");cardBase(ctx,p,5,"搭配与拍照提示");text(ctx,"把风格延续到",72,154,32,p.ink,"600");text(ctx,"日常搭配与照片里",72,203,62,p.ink,"850","left",'Georgia,"Songti SC","SimSun",serif');roundedRect(ctx,72,350,936,330,38,p.paper,p.soft);text(ctx,"日常搭配",112,392,36,p.accent,"850");wrapped(ctx,data.advice[2].text,112,456,836,27,42,p.ink,"500",4);roundedRect(ctx,112,585,836,62,16,p.soft);text(ctx,"先做：",136,603,21,p.accent,"800");wrapped(ctx,data.advice[2].action,214,601,700,20,30,p.ink,"550",2);roundedRect(ctx,72,720,936,330,38,p.paper,p.soft);text(ctx,"拍照提示",112,762,36,p.accent,"850");text(ctx,data.photo_check.status,112,824,27,p.ink,"750");wrapped(ctx,data.photo_check.message,112,876,836,25,39,p.ink,"500",4);let p5x=112;data.photo_check.tags.slice(0,3).forEach((tag)=>{p5x+=pill(ctx,tag,p5x,970,p)+12;});roundedRect(ctx,72,1092,936,166,30,p.accent);text(ctx,"真正适合你的，不是固定模板",112,1125,32,"#fff","800");wrapped(ctx,"而是让五官重点、发型轮廓与整体色调彼此配合。",112,1178,820,24,36,"#fff","500",2);
     }
     function showShareCard(index) { state.shareIndex=(index+shareCanvases.length)%shareCanvases.length;shareCanvases.forEach((canvas,i)=>canvas.classList.toggle("active",i===state.shareIndex));[...$("shareDots").children].forEach((dot,i)=>dot.classList.toggle("active",i===state.shareIndex));$("cardCounter").textContent=`${state.shareIndex+1} / ${shareCanvases.length}`; }
     function ensurePhotoImage() { if(state.photoImage)return Promise.resolve(state.photoImage);return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{state.photoImage=image;resolve(image);};image.onerror=reject;image.src=state.previewUrl;}); }
-    async function openShareStudio() { try{await ensurePhotoImage();}catch(_){state.photoImage=null;$("hidePhotoToggle").checked=true;}drawShareCards();showShareCard(0);$("shareModal").classList.remove("hidden");document.body.classList.add("modal-open");$("closeShareBtn").focus(); }
-    function closeShareStudio() { $("shareModal").classList.add("hidden");document.body.classList.remove("modal-open"); }
+    async function openShareStudio() { state.previousFocus=document.activeElement; $("hidePhotoToggle").checked=true; try{await ensurePhotoImage();}catch(_){state.photoImage=null;}drawShareCards();showShareCard(0);$("shareModal").classList.remove("hidden");document.body.classList.add("modal-open");$("downloadCardBtn").textContent=navigator.share&&navigator.canShare?"分享 / 下载当前图片":"下载当前图片";$("closeShareBtn").focus(); }
+    function closeShareStudio() { $("shareModal").classList.add("hidden");document.body.classList.remove("modal-open");if(state.previousFocus&&typeof state.previousFocus.focus==="function")state.previousFocus.focus(); }
     function setupShareDots() { clearChildren($("shareDots"));shareCanvases.forEach((_,index)=>{const dot=make("button","share-dot");dot.type="button";dot.setAttribute("aria-label",`查看第 ${index+1} 张`);dot.addEventListener("click",()=>showShareCard(index));$("shareDots").appendChild(dot);}); }
-    function downloadCurrentCard() { const canvas=shareCanvases[state.shareIndex];canvas.toBlob((blob)=>{if(!blob)return;const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`面部风格报告-${state.shareIndex+1}.png`;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);},"image/png"); }
+    async function downloadCurrentCard() { const canvas=shareCanvases[state.shareIndex];canvas.toBlob(async(blob)=>{if(!blob)return;const filename=`面部风格报告-${state.shareIndex+1}.png`;if(navigator.share&&navigator.canShare){try{const file=new File([blob],filename,{type:"image/png"});if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"我的面部风格报告",text:"我测出来的面部风格报告"});return;}}catch(error){if(error.name==="AbortError")return;}}const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);},"image/png"); }
 
     async function readResponse(response) { const contentType=response.headers.get("content-type")||"";if(contentType.includes("application/json"))return response.json();const body=await response.text();return{detail:body.trim()||`服务返回错误（${response.status}）`}; }
-    async function checkService() { try{const response=await fetch("health",{cache:"no-store"});if(!response.ok)throw new Error("服务不可用");const status=await response.json();state.serviceReady=status.status==="ok"&&status.offline===true;$("modelStatus").textContent=state.serviceReady?"离线分析服务已准备好":"离线模型尚未就绪";$("modelStatus").style.color=state.serviceReady?"var(--accent-dark)":"var(--warm)";}catch(_){state.serviceReady=false;$("modelStatus").textContent="分析服务连接失败，请稍后刷新";$("modelStatus").style.color="#a53d35";}$("analyzeBtn").disabled=!(state.serviceReady&&state.file); }
+    async function checkService() { try{const response=await fetch("health",{cache:"no-store"});if(!response.ok)throw new Error("服务不可用");const status=await response.json();state.serviceReady=status.status==="ok"&&status.offline===true;$("modelStatus").textContent=state.serviceReady?"本站本地分析服务已准备好":"本地分析模型尚未就绪";$("modelStatus").style.color=state.serviceReady?"var(--accent-dark)":"var(--warm)";}catch(_){state.serviceReady=false;$("modelStatus").textContent="分析服务连接失败，请点击重试";$("modelStatus").style.color="#a53d35";}$("retryServiceBtn").classList.toggle("hidden",state.serviceReady);$("analyzeBtn").disabled=!(state.serviceReady&&state.file); }
     function resetExperience() { closeShareStudio();if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=null;state.previewUrl=null;state.reportData=null;state.photoImage=null;state.shareIndex=0;$("appShell").removeAttribute("data-theme");$("photoInput").value="";$("previewImage").removeAttribute("src");$("resultThumb").removeAttribute("src");$("fileStatus").textContent="";$("analysisStatus").textContent="";$("analyzeBtn").disabled=true;setView("upload");window.scrollTo({top:0,behavior:"smooth"}); }
     $("chooseBtn").addEventListener("click",()=>{$("photoInput").value="";$("photoInput").click();});
     $("photoInput").addEventListener("change",(event)=>{const file=event.target.files[0];if(!file)return;if(!ALLOWED_FILE_TYPES.has(file.type)){$("fileStatus").textContent="仅支持 JPG、PNG 或 WebP 图片";return;}if(file.size>MAX_FILE_BYTES){$("fileStatus").textContent="图片不能超过 8 MB";return;}if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=file;state.previewUrl=URL.createObjectURL(file);state.photoImage=null;$("previewImage").src=state.previewUrl;$("fileName").textContent=file.name;$("analysisStatus").textContent=state.serviceReady?"照片已就绪，可以开始分析":"分析服务尚未连接，请稍候";$("analyzeBtn").disabled=!state.serviceReady;setView("preview");window.scrollTo({top:0,behavior:"smooth"});});
-    $("resetBtn").addEventListener("click",resetExperience);$("retestTopBtn").addEventListener("click",resetExperience);$("retestBottomBtn").addEventListener("click",resetExperience);
+    $("resetBtn").addEventListener("click",resetExperience);$("retestTopBtn").addEventListener("click",resetExperience);$("retestBottomBtn").addEventListener("click",resetExperience);$("retryServiceBtn").addEventListener("click",checkService);
     $("analyzeBtn").addEventListener("click",async()=>{if(!state.file||!state.serviceReady)return;const button=$("analyzeBtn");button.disabled=true;button.textContent="正在生成报告…";$("analysisStatus").textContent="正在检测面部关键点、照片条件与风格倾向";setView("analyzing");const form=new FormData();form.append("photo",state.file);const controller=new AbortController(),timeout=window.setTimeout(()=>controller.abort(),90000);try{const response=await fetch("api/analyze",{method:"POST",body:form,signal:controller.signal});const payload=await readResponse(response);if(!response.ok)throw new Error(payload.detail||"分析失败");renderReport(payload);}catch(error){const message=error.name==="AbortError"?"分析超时，请稍后重试":error.message;$("analysisStatus").textContent=`分析失败：${message}`;setView("preview");}finally{window.clearTimeout(timeout);button.disabled=!(state.serviceReady&&state.file);button.textContent="生成我的报告";}});
-    $("shareBtn").addEventListener("click",openShareStudio);$("closeShareBtn").addEventListener("click",closeShareStudio);$("prevCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex-1));$("nextCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex+1));$("hidePhotoToggle").addEventListener("change",drawShareCards);$("downloadCardBtn").addEventListener("click",downloadCurrentCard);$("downloadBtn").addEventListener("click",()=>window.print());$("shareModal").addEventListener("click",(event)=>{if(event.target===$("shareModal"))closeShareStudio();});document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&!$("shareModal").classList.contains("hidden"))closeShareStudio();});window.addEventListener("beforeunload",()=>{if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);});
+    $("shareBtn").addEventListener("click",openShareStudio);$("closeShareBtn").addEventListener("click",closeShareStudio);$("prevCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex-1));$("nextCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex+1));$("hidePhotoToggle").addEventListener("change",drawShareCards);$("downloadCardBtn").addEventListener("click",downloadCurrentCard);$("downloadBtn").addEventListener("click",()=>window.print());$("shareModal").addEventListener("click",(event)=>{if(event.target===$("shareModal"))closeShareStudio();});document.addEventListener("keydown",(event)=>{if($("shareModal").classList.contains("hidden"))return;if(event.key==="Escape"){closeShareStudio();return;}if(event.key!=="Tab")return;const focusable=[...$("shareModal").querySelectorAll("button,input")].filter((item)=>!item.disabled);const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}});window.addEventListener("beforeunload",()=>{if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);});
     setupShareDots();setView("upload");checkService();
   </script>
 </body>

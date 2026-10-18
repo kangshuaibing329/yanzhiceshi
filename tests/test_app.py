@@ -138,6 +138,19 @@ class MetricTests(unittest.TestCase):
         second_score, _ = app_module.photo_quality(second, landmarks)
         self.assertAlmostEqual(first_score, second_score, places=6)
 
+    def test_photo_composition_penalizes_face_near_frame_edges(self):
+        landmarks = make_landmarks()
+        central_score, _ = app_module.photo_composition(landmarks)
+        edge_landmarks = [SimpleNamespace(x=point.x, y=point.y, z=point.z) for point in landmarks]
+        edge_landmarks[234].x = 0.02
+        edge_landmarks[454].x = 0.98
+        edge_landmarks[10].y = 0.02
+        edge_landmarks[152].y = 0.98
+        edge_score, details = app_module.photo_composition(edge_landmarks)
+
+        self.assertLess(edge_score, central_score)
+        self.assertLess(details["min_margin"], 0.03)
+
     def test_pose_matrix_penalizes_yaw(self):
         identity_score, identity_angles = app_module.pose_from_matrix(np.eye(4))
         radians = np.deg2rad(30)
@@ -178,6 +191,23 @@ class MetricTests(unittest.TestCase):
         self.assertIn(" × ", style["combo_name"])
         self.assertEqual(len(style["keywords"]), 3)
 
+    def test_report_uses_photo_framing_and_actionable_improvement(self):
+        metrics = app_module.measure(make_landmarks(), Image.new("RGB", (320, 320), (150, 130, 120)), np.eye(4))
+        metrics["quality_details"] = {"brightness": 60.0, "contrast": 20.0, "sharpness": 1.0}
+        metrics["quality"] = 0.55
+        report = app_module.build_report(metrics)
+
+        self.assertEqual(
+            [section["name"] for section in report["sections"]],
+            ["五官比例", "轮廓线条", "照片质感", "上镜稳定性"],
+        )
+        self.assertEqual(report["improvement"]["title"], "先优化照片条件")
+        self.assertIn("只描述这张照片", report["photo_check"]["message"])
+        self.assertNotIn("皮相", " ".join(section["name"] for section in report["sections"]))
+        self.assertIn(report["photo_check"]["reference"], {"较低", "中等", "较高"})
+        self.assertIn("confidence_note", report["photo_check"])
+        self.assertIn("calibration", report["method"])
+
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
@@ -209,14 +239,20 @@ class ApiTests(unittest.TestCase):
         self.assertIn("improvement", payload)
         self.assertIn("secondary_name", payload["style"])
         self.assertIn("tendency", payload["style"])
+        self.assertIn("signal", payload["style"])
+        self.assertEqual(set(payload["style"]["scores"]), {"清冷感", "甜感", "明艳感", "氛围感"})
         self.assertIn("combo_name", payload["style"])
         self.assertIn("identity", payload["style"])
+        self.assertIn("description", payload["style"])
         self.assertIn("share", payload)
         self.assertEqual(len(payload["share"]["formula"]), 3)
         self.assertEqual(len(payload["share"]["keywords"]), 3)
         self.assertIn(payload["photo_check"]["reference"], {"中等", "较高"})
         self.assertEqual(len(payload["sections"]), 4)
         self.assertEqual(len(payload["advice"]), 3)
+        self.assertIn("composition", payload["photo_check"])
+        self.assertIn("confidence", payload["photo_check"])
+        self.assertIn("calibration", payload["method"])
         self.assertTrue(all("evidence" in section for section in payload["sections"]))
         self.assertTrue(all({"avoid", "action"} <= set(item) for item in payload["advice"]))
 

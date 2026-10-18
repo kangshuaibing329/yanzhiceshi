@@ -28,7 +28,7 @@ ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 ALLOWED_FORMATS = ("JPEG", "PNG", "WEBP")
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
-app = FastAPI(title="面部风格分析服务", version="1.3.0")
+app = FastAPI(title="面部风格分析服务", version="1.4.0")
 
 BaseOptions = mp.tasks.BaseOptions
 FaceLandmarker = mp.tasks.vision.FaceLandmarker
@@ -115,17 +115,21 @@ def decode_image(content: bytes) -> Image.Image:
         raise InvalidImageError("无法识别这张图片") from None
 
 
-def face_region(image: Image.Image, landmarks) -> Image.Image:
+def face_bounds(landmarks) -> tuple[float, float, float, float] | None:
     xs = [point.x for point in landmarks if math.isfinite(point.x)]
     ys = [point.y for point in landmarks if math.isfinite(point.y)]
     if not xs or not ys:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def face_region(image: Image.Image, landmarks) -> Image.Image:
+    bounds = face_bounds(landmarks)
+    if bounds is None:
         return image
 
     width, height = image.size
-    left = min(xs) * width
-    right = max(xs) * width
-    top = min(ys) * height
-    bottom = max(ys) * height
+    left, top, right, bottom = (value * scale for value, scale in zip(bounds, (width, height, width, height)))
     pad_x = (right - left) * 0.08
     pad_y = (bottom - top) * 0.08
     box = (
@@ -137,6 +141,30 @@ def face_region(image: Image.Image, landmarks) -> Image.Image:
     if box[2] - box[0] < 32 or box[3] - box[1] < 32:
         return image
     return image.crop(box)
+
+
+def photo_composition(landmarks) -> tuple[float, dict[str, float]]:
+    """Estimate whether the face has enough framing room for a stable observation."""
+    bounds = face_bounds(landmarks)
+    if bounds is None:
+        return 0.0, {"face_area": 0.0, "min_margin": 0.0, "center_offset": 1.0}
+
+    left, top, right, bottom = bounds
+    face_width = max(0.0, right - left)
+    face_height = max(0.0, bottom - top)
+    face_area = face_width * face_height
+    min_margin = min(left, top, 1.0 - right, 1.0 - bottom)
+    center_offset = math.hypot((left + right) / 2.0 - 0.5, (top + bottom) / 2.0 - 0.5)
+
+    edge_score = clamp(min_margin / 0.06)
+    coverage_score = clamp(1.0 - abs(face_area - 0.28) / 0.30)
+    center_score = clamp(1.0 - center_offset / 0.42)
+    composition = clamp(edge_score * 0.55 + coverage_score * 0.25 + center_score * 0.20)
+    return composition, {
+        "face_area": round(face_area, 4),
+        "min_margin": round(min_margin, 4),
+        "center_offset": round(center_offset, 4),
+    }
 
 
 def photo_quality(image: Image.Image, landmarks) -> tuple[float, dict[str, float]]:
@@ -242,8 +270,18 @@ def measure(landmarks, image: Image.Image, pose_matrix=None) -> dict[str, float 
         yaw = abs(p(1).x - eye_mid_x) / face_width
         pose_stability = float(np.mean([eye_roll, clamp(1.0 - yaw / 0.12)]))
 
-    feature_score = clamp((harmony * 0.43 + symmetry * 0.27 + structure * 0.12) / 0.82)
-    photo_condition = clamp((pose_stability * 0.10 + quality * 0.08) / 0.18)
+    composition, composition_details = photo_composition(landmarks)
+    feature_score = clamp(
+        harmony * 0.36
+        + symmetry * 0.24
+        + structure * 0.15
+        + feature_presence * 0.25
+    )
+    photo_condition = clamp(
+        pose_stability * 0.35
+        + quality * 0.45
+        + composition * 0.20
+    )
     raw_index = clamp(feature_score * 0.82 + photo_condition * 0.18)
     score = presentation_score(raw_index)
     return {
@@ -256,6 +294,7 @@ def measure(landmarks, image: Image.Image, pose_matrix=None) -> dict[str, float 
         "feature_emphasis": feature_emphasis,
         "quality": quality,
         "pose_stability": pose_stability,
+        "composition": composition,
         "feature_score": feature_score,
         "photo_condition": photo_condition,
         "face_ratio": face_ratio,
@@ -267,6 +306,7 @@ def measure(landmarks, image: Image.Image, pose_matrix=None) -> dict[str, float 
         "raw_index": raw_index,
         "score": score,
         "quality_details": quality_details,
+        "composition_details": composition_details,
         "pose_angles": pose_angles,
     }
 
@@ -311,6 +351,7 @@ def choose_style(metrics: dict) -> dict:
     primary, secondary = ranked[:2]
     margin = primary["value"] - secondary["value"]
     tendency = "混合倾向" if margin < 0.04 else "双重倾向" if margin < 0.10 else "主风格较明确"
+    signal = "风格信号较明确" if margin >= 0.10 else "两个风格信号接近" if margin < 0.04 else "存在明显的双重倾向"
     pair = frozenset((primary["name"], secondary["name"]))
     combo_copy = {
         frozenset(("清冷感", "明艳感")): ("高辨识度与克制感并存", "五官有存在感，越懂得留白，越容易显出高级和记忆点。"),
@@ -333,7 +374,9 @@ def choose_style(metrics: dict) -> dict:
         "tags": keywords,
         "secondary_name": secondary["name"],
         "tendency": tendency,
+        "signal": signal,
         "margin": round(margin, 3),
+        "scores": {item["name"]: round(item["value"], 3) for item in ranked},
         "combo_name": combo_name,
         "identity": identity,
         "share_line": share_line,
@@ -375,61 +418,92 @@ def photo_check(metrics: dict) -> dict:
     else:
         tags.append("正脸稳定")
 
-    if warnings_found:
+    composition = metrics["composition"]
+    if composition < 0.55:
+        tags.append("构图过近或贴边")
+        warnings_found.append("让面部四周保留更多空间")
+    elif composition < 0.75:
+        tags.append("构图较近")
+        warnings_found.append("尽量不要把面部贴到画面边缘")
+    else:
+        tags.append("构图空间稳定")
+
+    confidence = clamp(
+        metrics["quality"] * 0.45
+        + metrics["pose_stability"] * 0.25
+        + composition * 0.30
+    )
+    if confidence >= 0.78:
+        reference = "较高"
+        confidence_note = "光线、清晰度、朝向与构图共同满足较稳定的观察条件。"
+    elif confidence >= 0.52:
+        reference = "中等"
+        confidence_note = "可以观察整体关系，但照片条件会影响部分细节的判断。"
+    else:
+        reference = "较低"
+        confidence_note = "建议先改善照片条件，再把这次结果用于妆发或搭配比较。"
+
+    if warnings_found or reference == "较低":
         return {
-            "status": "分析可用 · 参考度中等",
+            "status": f"分析可用 · 参考度{reference}",
             "tone": "warn",
             "tags": tags,
-            "message": "；".join(dict.fromkeys(warnings_found)) + "，复测会更稳定。",
+            "message": "；".join(dict.fromkeys(warnings_found)) + ("，" if warnings_found else "") + f"{confidence_note}结果只描述这张照片，复测会更稳定。",
             "angles": angles,
-            "reference": "中等",
+            "reference": reference,
+            "composition": round(composition, 2),
+            "confidence": round(confidence, 2),
+            "confidence_note": confidence_note,
         }
     return {
-        "status": "分析参考度较高",
+        "status": f"分析参考度{reference}",
         "tone": "good",
         "tags": tags,
-        "message": "当前照片的光线、清晰度与面部朝向适合进行比例和风格观察。",
+        "message": f"{confidence_note}结果只描述这张照片。",
         "angles": angles,
-        "reference": "较高",
+        "reference": reference,
+        "composition": round(composition, 2),
+        "confidence": round(confidence, 2),
+        "confidence_note": confidence_note,
     }
 
 
 def build_report(metrics: dict) -> dict:
     style = choose_style(metrics)
     if metrics["score"] >= 8.6:
-        score_label = "你的辨识度，很容易被看见"
-        summary = f"这张照片里，你呈现出明显的{style['combo_name']}气质。{style['share_line']}"
+        score_label = "这张照片的风格信号很清晰"
+        summary = f"在这张照片里，你呈现出明显的{style['combo_name']}倾向。{style['share_line']}"
     elif metrics["score"] >= 7.6:
-        score_label = "你的优势，属于越看越清晰"
-        summary = f"这张照片里，你更接近{style['combo_name']}。{style['share_line']}"
+        score_label = "这张照片里的优势比较容易被看见"
+        summary = f"在这张照片里，你更接近{style['combo_name']}。{style['share_line']}"
     else:
-        score_label = "你的个人特点已经出现"
-        summary = f"当前更接近{style['combo_name']}，调整光线或造型后，风格信号会更稳定。"
+        score_label = "这张照片已经呈现出个人特点"
+        summary = f"当前照片更接近{style['combo_name']}，调整光线或造型后，风格信号可能会更稳定。"
 
     sections = [
         {
-            "name": "五官协调",
+            "name": "五官比例",
             "score": presentation_score(metrics["harmony"]),
             "observation": "眉眼、鼻唇之间的视觉重量比较均衡，第一眼不会被单一区域打断。" if metrics["harmony"] >= 0.72 else "五官大小关系有个人辨识度，镜头距离会明显改变整体观感。",
             "evidence": "基于眼距、嘴宽与面部纵横关系的相对比例观察，不使用绝对尺寸。",
             "suggestion": "保留自然眉眼关系，只选眼妆或唇色中的一个作为视觉中心。",
         },
         {
-            "name": "轮廓骨相",
+            "name": "轮廓线条",
             "score": presentation_score(metrics["structure"] * 0.65 + metrics["symmetry"] * 0.35),
             "observation": "面部纵向延伸感更明显，利落线条和适度侧分容易放大轮廓优势。" if metrics["face_ratio"] >= 1.34 else "面部外轮廓更显柔和，轻盈层次与顶部蓬松感更容易拉开比例。",
-            "evidence": "对比面部纵横关系、中心线与左右外轮廓；拍摄角度变化会影响结果。",
+            "evidence": "观察面部纵横关系、中心线与左右外轮廓的照片呈现；拍摄角度变化会影响结果。",
             "suggestion": "让发型在颧骨到下颌附近保留层次，避免两侧同时完全贴脸。",
         },
         {
-            "name": "光影质感",
+            "name": "照片质感",
             "score": score10(metrics["quality"]),
-            "observation": "当前画面的曝光、对比与清晰度共同决定了皮相细节在照片里的呈现。",
+            "observation": "当前画面的曝光、对比与清晰度共同决定了面部细节在照片里的呈现。",
             "evidence": "这一项只衡量照片成像，不等同于真实肤质、皮肤状态或医学判断。",
             "suggestion": "优先使用窗边正面自然光，减少强磨皮与顶光，再判断妆面质感。",
         },
         {
-            "name": "上镜表现",
+            "name": "上镜稳定性",
             "score": score10(float(np.mean([metrics["harmony"], metrics["symmetry"], metrics["quality"], metrics["pose_stability"]]))),
             "observation": "面部朝向稳定，当前结果对左右关系的参考价值较高。" if metrics["pose_stability"] >= 0.72 else "面部有轻微偏转，左右关系会受到角度影响，但仍可观察整体风格。",
             "evidence": "综合三轴面部姿态、左右眼位与画面清晰度，判断这张照片的分析可用性。",
@@ -476,14 +550,25 @@ def build_report(metrics: dict) -> dict:
         {"title": item["name"], "text": item["observation"]}
         for item in ranked_sections[:2]
     ]
-    improvement_section = ranked_sections[-1]
-    improvement_title = "本次照片优化" if improvement_section["name"] == "光影质感" else improvement_section["name"]
     advice = [
         {"title": "化妆建议", "label": "单点强调", "text": makeup[0], "avoid": makeup[1], "action": makeup[2]},
         {"title": "发型建议", "label": "修饰轮廓", "text": hair[0], "avoid": hair[1], "action": hair[2]},
         {"title": "日常搭配", "label": "延续气质", "text": outfit[0], "avoid": outfit[1], "action": outfit[2]},
     ]
     reference = photo_check(metrics)
+    if reference["tone"] == "warn":
+        improvement = {
+            "title": "先优化照片条件",
+            "text": f"{reference['message']} 建议用相近构图重新拍摄后，再比较妆发与穿搭效果。",
+        }
+    elif metrics["eye_gap_ratio"] >= 0.27:
+        improvement = {"title": "先收束眉眼重点", "text": eye_action}
+    elif metrics["eye_gap_ratio"] <= 0.21:
+        improvement = {"title": "先给眉眼增加延伸", "text": eye_action}
+    elif metrics["face_ratio"] >= 1.34:
+        improvement = {"title": "先试轻侧分层次", "text": hair_text}
+    else:
+        improvement = {"title": "先试轻盈顶部层次", "text": hair_text}
 
     return {
         "score": round(metrics["score"], 1),
@@ -499,16 +584,15 @@ def build_report(metrics: dict) -> dict:
             "tags": style["tags"],
             "secondary_name": style["secondary_name"],
             "tendency": style["tendency"],
+            "signal": style["signal"],
             "combo_name": style["combo_name"],
             "identity": style["identity"],
             "share_line": style["share_line"],
+            "scores": style["scores"],
         },
         "photo_check": reference,
         "highlights": highlights,
-        "improvement": {
-            "title": improvement_title,
-            "text": improvement_section["suggestion"],
-        },
+        "improvement": improvement,
         "sections": sections,
         "advice": advice,
         "share": {
@@ -525,8 +609,9 @@ def build_report(metrics: dict) -> dict:
         },
         "method": {
             "model": "MediaPipe Face Landmarker (offline)",
-            "metrics": "面部关键点、相对比例、左右平衡、三轴姿态，以及面部区域的曝光、对比度和清晰度",
-            "notice": "分数是由规则指标映射到 5.0–9.5 的实验性照片呈现量表，不是人群百分位、医学诊断或客观颜值结论。",
+            "metrics": "面部关键点、相对比例、左右平衡、三轴姿态、构图边界，以及面部区域的曝光、对比度和清晰度",
+            "notice": "分数是由规则指标映射到 5.0–9.5 的实验性照片呈现量表，只描述当前照片，不是人群百分位、医学诊断或客观颜值结论。",
+            "calibration": "当前权重来自可解释的规则设计，尚未用足量、脱敏、取得授权的人群数据做统计校准；结果适合做风格探索，不适合做人与人之间的排名。",
         },
     }
 
@@ -579,6 +664,8 @@ def analyze(photo: UploadFile = File(...)) -> dict:
             raise HTTPException(422, "照片曝光或清晰度不足，请在自然光下重新拍摄")
         if metrics["pose_stability"] < 0.30:
             raise HTTPException(422, "面部角度偏移较大，请上传更接近正面的照片")
+        if metrics["composition"] < 0.25:
+            raise HTTPException(422, "面部裁切或构图过近，请让脸部四周保留更多空间")
         return build_report(metrics)
     finally:
         _request_slots.release()
