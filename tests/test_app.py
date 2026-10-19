@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import io
 import os
@@ -18,6 +19,7 @@ APP_PATH = ROOT / "server" / "app.py"
 MODEL_FILE = tempfile.NamedTemporaryFile(suffix=".task", delete=False)
 MODEL_FILE.close()
 os.environ["MODEL_PATH"] = MODEL_FILE.name
+os.environ["MODEL_SHA256"] = hashlib.sha256(Path(MODEL_FILE.name).read_bytes()).hexdigest()
 os.environ["INDEX_PATH"] = str(ROOT / "index.html")
 
 
@@ -171,9 +173,25 @@ class MetricTests(unittest.TestCase):
         self.assertEqual(app_module.score10(1.0), 10.0)
 
     def test_presentation_scale_has_explicit_bounds_and_is_monotonic(self):
-        self.assertEqual(app_module.presentation_score(0.60), 5.0)
+        self.assertEqual(app_module.presentation_score(0.00), 5.0)
+        self.assertEqual(app_module.presentation_score(0.60), 7.7)
         self.assertEqual(app_module.presentation_score(1.00), 9.5)
         self.assertLess(app_module.presentation_score(0.72), app_module.presentation_score(0.84))
+
+    def test_style_ties_are_reported_as_mixed_and_rank_deterministically(self):
+        style = app_module.choose_style({
+            "structure": 0.5,
+            "symmetry": 0.5,
+            "vertical_balance": 0.5,
+            "roundness": 0.5,
+            "feature_emphasis": 0.5,
+            "feature_presence": 0.5,
+            "harmony": 0.5,
+        })
+        self.assertEqual(style["margin"], 0.0)
+        self.assertEqual(style["tendency"], "混合倾向")
+        self.assertEqual(style["signal"], "两个风格信号接近")
+        self.assertNotEqual(style["name"], style["secondary_name"])
 
     def test_style_returns_primary_secondary_and_tendency(self):
         style = app_module.choose_style({
@@ -219,6 +237,15 @@ class ApiTests(unittest.TestCase):
     def tearDown(self):
         app_module._landmarker.detect = self.original_detect
         app_module.measure = self.original_measure
+
+    def test_oversized_request_body_is_rejected_before_multipart_parsing(self):
+        response = self.client.post(
+            "/api/analyze",
+            content=b"x" * (9 * 1024 * 1024 + 1),
+            headers={"content-type": "multipart/form-data; boundary=test-boundary"},
+        )
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("请求体不能超过", response.json()["detail"])
 
     def test_legitimate_jpeg_keeps_existing_api_contract(self):
         app_module._landmarker.detect = lambda _image: SimpleNamespace(
