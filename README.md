@@ -22,6 +22,8 @@ $env:INDEX_PATH = "$PWD\index.html"
 & .\.venv\Scripts\uvicorn.exe server.app:app --host 127.0.0.1 --port 8812
 ```
 
+启动时会校验离线模型的 SHA-256；若使用经确认的其他模型文件，可通过 `MODEL_SHA256` 环境变量显式指定对应哈希。分析接口限制上传文件不超过 8 MiB，并在 multipart 解析前限制请求体不超过 9 MiB。生产部署还应在网关或 Nginx 的 `http` 配置层设置请求频率限制，避免公开服务被高频调用。
+
 打开 `http://127.0.0.1:8812/`。
 
 ## 验证
