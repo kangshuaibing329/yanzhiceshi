@@ -225,6 +225,9 @@ class MetricTests(unittest.TestCase):
         self.assertIn(report["photo_check"]["reference"], {"较低", "中等", "较高"})
         self.assertIn("confidence_note", report["photo_check"])
         self.assertIn("calibration", report["method"])
+        displayed_scores = [section["score"] for section in report["sections"]]
+        displayed_scores.extend(report["overview"].values())
+        self.assertTrue(all(5.0 <= score <= 9.5 for score in displayed_scores))
 
 
 class ApiTests(unittest.TestCase):
