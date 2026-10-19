@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import math
 import os
@@ -22,6 +23,11 @@ else:
     index_candidates = (BASE_DIR / "static" / "index.html", BASE_DIR.parent / "index.html")
     INDEX_PATH = next((path for path in index_candidates if path.is_file()), index_candidates[0])
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+MAX_REQUEST_BODY_BYTES = 9 * 1024 * 1024
+EXPECTED_MODEL_SHA256 = os.environ.get(
+    "MODEL_SHA256",
+    "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+).strip().lower()
 MAX_IMAGE_PIXELS = 20_000_000
 MAX_IMAGE_DIMENSION = 6_500
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
@@ -29,6 +35,59 @@ ALLOWED_FORMATS = ("JPEG", "PNG", "WEBP")
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 app = FastAPI(title="面部风格分析服务", version="1.4.0")
+
+
+class RequestBodyTooLarge(Exception):
+    pass
+
+
+class RequestBodyLimitMiddleware:
+    """Reject oversized analysis requests before multipart parsing consumes them."""
+
+    def __init__(self, app, max_body_bytes: int):
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http" or scope.get("path") != "/api/analyze" or scope.get("method") != "POST":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length = headers.get(b"content-length")
+        if content_length:
+            try:
+                if int(content_length) > self.max_body_bytes:
+                    await self._reject(scope, receive, send)
+                    return
+            except ValueError:
+                await self._reject(scope, receive, send, status_code=400, detail="请求头中的内容长度无效")
+                return
+
+        received = 0
+
+        async def limited_receive():
+            nonlocal received
+            message = await receive()
+            if message.get("type") == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    raise RequestBodyTooLarge
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            await self._reject(scope, receive, send)
+
+    async def _reject(self, scope, receive, send, status_code: int = 413, detail: str = "请求体不能超过 9 MB"):
+        from starlette.responses import JSONResponse
+
+        response = JSONResponse(status_code=status_code, content={"detail": detail})
+        await response(scope, receive, send)
+
+
+app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=MAX_REQUEST_BODY_BYTES)
 
 BaseOptions = mp.tasks.BaseOptions
 FaceLandmarker = mp.tasks.vision.FaceLandmarker
@@ -40,9 +99,18 @@ if not MODEL_PATH.is_file():
 if not INDEX_PATH.is_file():
     raise RuntimeError(f"前端页面不存在: {INDEX_PATH}")
 
+_model_bytes = MODEL_PATH.read_bytes()
+if len(EXPECTED_MODEL_SHA256) != 64 or any(char not in "0123456789abcdef" for char in EXPECTED_MODEL_SHA256):
+    raise RuntimeError("MODEL_SHA256 必须是 64 位十六进制 SHA-256 值")
+_actual_model_sha256 = hashlib.sha256(_model_bytes).hexdigest()
+if _actual_model_sha256 != EXPECTED_MODEL_SHA256:
+    raise RuntimeError(
+        f"离线模型 SHA-256 校验失败: expected={EXPECTED_MODEL_SHA256}, actual={_actual_model_sha256}"
+    )
+
 _landmarker = FaceLandmarker.create_from_options(
     FaceLandmarkerOptions(
-        base_options=BaseOptions(model_asset_buffer=MODEL_PATH.read_bytes()),
+        base_options=BaseOptions(model_asset_buffer=_model_bytes),
         running_mode=VisionRunningMode.IMAGE,
         num_faces=2,
         min_face_detection_confidence=0.6,
@@ -316,8 +384,8 @@ def score10(value: float) -> float:
 
 
 def presentation_score(value: float) -> float:
-    """Map a 0-1 rule index to the product's 5.0-9.5 presentation scale."""
-    return round(5.0 + 4.5 * clamp((value - 0.60) / 0.40), 1)
+    """Map a 0-1 rule index linearly to the shared 5.0-9.5 display scale."""
+    return round(5.0 + 4.5 * clamp(value), 1)
 
 
 def choose_style(metrics: dict) -> dict:
@@ -347,7 +415,7 @@ def choose_style(metrics: dict) -> dict:
             "tags": ["自然光线", "层次穿搭", "松弛感"],
         },
     ]
-    ranked = sorted(candidates, key=lambda item: item["value"], reverse=True)
+    ranked = sorted(candidates, key=lambda item: (-item["value"], item["name"]))
     primary, secondary = ranked[:2]
     margin = primary["value"] - secondary["value"]
     tendency = "混合倾向" if margin < 0.04 else "双重倾向" if margin < 0.10 else "主风格较明确"
@@ -470,15 +538,15 @@ def photo_check(metrics: dict) -> dict:
 
 def build_report(metrics: dict) -> dict:
     style = choose_style(metrics)
-    if metrics["score"] >= 8.6:
-        score_label = "这张照片的风格信号很清晰"
-        summary = f"在这张照片里，你呈现出明显的{style['combo_name']}倾向。{style['share_line']}"
-    elif metrics["score"] >= 7.6:
-        score_label = "这张照片里的优势比较容易被看见"
-        summary = f"在这张照片里，你更接近{style['combo_name']}。{style['share_line']}"
+    if style["margin"] < 0.04:
+        score_label = "两个风格信号接近，适合按混合倾向理解"
+        summary = f"这张照片里的{style['combo_name']}信号接近，没有必要强行区分主次。{style['share_line']}"
+    elif style["margin"] < 0.10:
+        score_label = "这张照片呈现出双重风格倾向"
+        summary = f"这张照片里，{style['combo_name']}两种风格共同出现。{style['share_line']}"
     else:
-        score_label = "这张照片已经呈现出个人特点"
-        summary = f"当前照片更接近{style['combo_name']}，调整光线或造型后，风格信号可能会更稳定。"
+        score_label = "这张照片的主风格信号较明确"
+        summary = f"在这张照片里，你更接近{style['combo_name']}。{style['share_line']}"
 
     sections = [
         {
@@ -497,14 +565,14 @@ def build_report(metrics: dict) -> dict:
         },
         {
             "name": "照片质感",
-            "score": score10(metrics["quality"]),
+            "score": presentation_score(metrics["quality"]),
             "observation": "当前画面的曝光、对比与清晰度共同决定了面部细节在照片里的呈现。",
             "evidence": "这一项只衡量照片成像，不等同于真实肤质、皮肤状态或医学判断。",
             "suggestion": "优先使用窗边正面自然光，减少强磨皮与顶光，再判断妆面质感。",
         },
         {
             "name": "上镜稳定性",
-            "score": score10(float(np.mean([metrics["harmony"], metrics["symmetry"], metrics["quality"], metrics["pose_stability"]]))),
+            "score": presentation_score(float(np.mean([metrics["harmony"], metrics["symmetry"], metrics["quality"], metrics["pose_stability"]]))),
             "observation": "面部朝向稳定，当前结果对左右关系的参考价值较高。" if metrics["pose_stability"] >= 0.72 else "面部有轻微偏转，左右关系会受到角度影响，但仍可观察整体风格。",
             "evidence": "综合三轴面部姿态、左右眼位与画面清晰度，判断这张照片的分析可用性。",
             "suggestion": "镜头略高于眼睛，肩膀放松，面部只做很小幅度的侧转会更自然。",
@@ -576,7 +644,7 @@ def build_report(metrics: dict) -> dict:
         "summary": summary,
         "overview": {
             "feature_score": presentation_score(metrics["feature_score"]),
-            "photo_score": score10(metrics["photo_condition"]),
+            "photo_score": presentation_score(metrics["photo_condition"]),
         },
         "style": {
             "name": style["name"],
@@ -610,7 +678,7 @@ def build_report(metrics: dict) -> dict:
         "method": {
             "model": "MediaPipe Face Landmarker (offline)",
             "metrics": "面部关键点、相对比例、左右平衡、三轴姿态、构图边界，以及面部区域的曝光、对比度和清晰度",
-            "notice": "分数是由规则指标映射到 5.0–9.5 的实验性照片呈现量表，只描述当前照片，不是人群百分位、医学诊断或客观颜值结论。",
+            "notice": "分数是由规则指标映射到 5.0–9.5 的实验性照片呈现量表，只描述当前照片，不是人群百分位、医学诊断或客观颜值结论。四项观察使用统一显示尺度，但维度之间仍是启发式指标，不能视为经统计校准的相对排名。",
             "calibration": "当前权重来自可解释的规则设计，尚未用足量、脱敏、取得授权的人群数据做统计校准；结果适合做风格探索，不适合做人与人之间的排名。",
         },
     }

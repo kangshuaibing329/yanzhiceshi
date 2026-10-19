@@ -172,8 +172,9 @@
     .share-dots { display:flex; justify-content:center; gap:7px; }
     .share-dot { width:7px; height:7px; padding:0; border:0; border-radius:50%; background:#c9c4bc; cursor:pointer; }
     .share-dot.active { width:19px; border-radius:99px; background:var(--accent); }
-    .share-download { padding:0 18px 18px; }
+    .share-download { padding:0 18px 6px; }
     .share-download button { width:100%; }
+    .share-status { min-height:1.4em; margin:0; padding:0 18px 12px; color:var(--muted); font-size:12px; line-height:1.5; }
 
     @media (max-width:700px) {
       .result-hero { padding:18px; }
@@ -362,6 +363,7 @@
         <button class="icon-btn" id="nextCardBtn" type="button" aria-label="下一张">→</button>
       </nav>
       <div class="share-download"><button class="primary-btn" id="downloadCardBtn" type="button">下载当前图片</button></div>
+      <p class="share-status" id="shareStatus" role="status" aria-live="polite"></p>
     </section>
   </div>
 
@@ -435,7 +437,36 @@
     async function openShareStudio() { state.previousFocus=document.activeElement; $("hidePhotoToggle").checked=true; try{await ensurePhotoImage();}catch(_){state.photoImage=null;}drawShareCards();showShareCard(0);$("shareModal").classList.remove("hidden");document.body.classList.add("modal-open");$("downloadCardBtn").textContent=navigator.share&&navigator.canShare?"分享 / 下载当前图片":"下载当前图片";$("closeShareBtn").focus(); }
     function closeShareStudio() { $("shareModal").classList.add("hidden");document.body.classList.remove("modal-open");if(state.previousFocus&&typeof state.previousFocus.focus==="function")state.previousFocus.focus(); }
     function setupShareDots() { clearChildren($("shareDots"));shareCanvases.forEach((_,index)=>{const dot=make("button","share-dot");dot.type="button";dot.setAttribute("aria-label",`查看第 ${index+1} 张`);dot.addEventListener("click",()=>showShareCard(index));$("shareDots").appendChild(dot);}); }
-    async function downloadCurrentCard() { const canvas=shareCanvases[state.shareIndex];canvas.toBlob(async(blob)=>{if(!blob)return;const filename=`面部风格报告-${state.shareIndex+1}.png`;if(navigator.share&&navigator.canShare){try{const file=new File([blob],filename,{type:"image/png"});if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"我的面部风格报告",text:"我测出来的面部风格报告"});return;}}catch(error){if(error.name==="AbortError")return;}}const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);},"image/png"); }
+    async function downloadCurrentCard() {
+      const canvas=shareCanvases[state.shareIndex];
+      const status=$("shareStatus");
+      status.textContent="";
+      try {
+        const blob=await new Promise((resolve,reject)=>{
+          try { canvas.toBlob((result)=>result?resolve(result):reject(new Error("浏览器未能生成 PNG 图片")),"image/png"); }
+          catch(error) { reject(error); }
+        });
+        const filename=`面部风格报告-${state.shareIndex+1}.png`;
+        if(navigator.share&&navigator.canShare) {
+          try {
+            const file=new File([blob],filename,{type:"image/png"});
+            if(navigator.canShare({files:[file]})) {
+              await navigator.share({files:[file],title:"我的面部风格报告",text:"我测出来的面部风格报告"});
+              status.textContent="已调用系统分享。";
+              return;
+            }
+          } catch(error) {
+            if(error.name==="AbortError") { status.textContent="已取消分享。"; return; }
+          }
+        }
+        const url=URL.createObjectURL(blob),link=document.createElement("a");
+        link.href=url;link.download=filename;link.click();
+        window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+        status.textContent="已触发下载；若文件未保存，请检查浏览器下载权限。";
+      } catch(error) {
+        status.textContent=`图片导出失败：${error.message||"请重试"}`;
+      }
+    }
 
     async function readResponse(response) { const contentType=response.headers.get("content-type")||"";if(contentType.includes("application/json"))return response.json();const body=await response.text();return{detail:body.trim()||`服务返回错误（${response.status}）`}; }
     async function checkService() { try{const response=await fetch("health",{cache:"no-store"});if(!response.ok)throw new Error("服务不可用");const status=await response.json();state.serviceReady=status.status==="ok"&&status.offline===true;$("modelStatus").textContent=state.serviceReady?"本站本地分析服务已准备好":"本地分析模型尚未就绪";$("modelStatus").style.color=state.serviceReady?"var(--accent-dark)":"var(--warm)";}catch(_){state.serviceReady=false;$("modelStatus").textContent="分析服务连接失败，请点击重试";$("modelStatus").style.color="#a53d35";}$("retryServiceBtn").classList.toggle("hidden",state.serviceReady);$("analyzeBtn").disabled=!(state.serviceReady&&state.file); }
