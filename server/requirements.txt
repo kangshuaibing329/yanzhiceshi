@@ -6,3 +6,6 @@ numpy==1.26.4
 mediapipe==0.10.21
 jax==0.7.1
 jaxlib==0.7.1
+
+# TestClient requires httpx; keep test-only dependencies explicit.
+httpx==0.28.1
