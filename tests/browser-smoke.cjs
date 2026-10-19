@@ -64,11 +64,15 @@ if (!executablePath) throw new Error("CHROME_PATH is required");
       await page.screenshot({ path: path.join(screenshotDir, "03-mobile-report.png"), fullPage: true });
       await page.setViewportSize({ width: 1365, height: 1000 });
       await page.screenshot({ path: path.join(screenshotDir, "04-desktop-report.png"), fullPage: true });
+      await page.setViewportSize({ width: 320, height: 800 });
+      const narrowViewportOverflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+      assert.equal(narrowViewportOverflows, false, "report layout must not overflow a 320px viewport");
       await page.setViewportSize({ width: 430, height: 932 });
     }
 
     await page.click("#shareBtn");
     assert.equal(await page.locator("#shareModal").isVisible(), true);
+    assert.equal(await page.locator("#shareStatus").getAttribute("role"), "status");
     const canvasSizes = await page.locator(".share-card-canvas").evaluateAll((canvases) =>
       canvases.map((canvas) => ({ width: canvas.width, height: canvas.height })),
     );
