@@ -415,7 +415,7 @@ def choose_style(metrics: dict) -> dict:
             "tags": ["自然光线", "层次穿搭", "松弛感"],
         },
     ]
-    ranked = sorted(candidates, key=lambda item: (-round(item["value"], 6), item["name"]))
+    ranked = sorted(candidates, key=lambda item: (-item["value"], item["name"]))
     primary, secondary = ranked[:2]
     margin = primary["value"] - secondary["value"]
     tendency = "混合倾向" if margin < 0.04 else "双重倾向" if margin < 0.10 else "主风格较明确"
