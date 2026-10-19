@@ -7,5 +7,5 @@ mediapipe==0.10.21
 jax==0.7.1
 jaxlib==0.7.1
 
-# TestClient requires httpx; keep test-only dependencies explicit.
+# Required by FastAPI's TestClient used in the repository test suite.
 httpx==0.28.1
