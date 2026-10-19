@@ -644,7 +644,7 @@ def build_report(metrics: dict) -> dict:
         "summary": summary,
         "overview": {
             "feature_score": presentation_score(metrics["feature_score"]),
-            "photo_score": score10(metrics["photo_condition"]),
+            "photo_score": presentation_score(metrics["photo_condition"]),
         },
         "style": {
             "name": style["name"],
