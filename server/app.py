@@ -30,11 +30,12 @@ EXPECTED_MODEL_SHA256 = os.environ.get(
 ).strip().lower()
 MAX_IMAGE_PIXELS = 20_000_000
 MAX_IMAGE_DIMENSION = 6_500
+ANALYSIS_IMAGE_MAX_DIMENSION = 1_024
 ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 ALLOWED_FORMATS = ("JPEG", "PNG", "WEBP")
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
-app = FastAPI(title="面部风格分析服务", version="1.4.0")
+app = FastAPI(title="面部风格分析服务", version="1.4.1")
 
 
 class RequestBodyTooLarge(Exception):
@@ -163,7 +164,7 @@ def decode_image(content: bytes) -> Image.Image:
                 probe.verify()
 
             with Image.open(io.BytesIO(content), formats=ALLOWED_FORMATS) as opened:
-                opened.draft("RGB", (1800, 1800))
+                opened.draft("RGB", (ANALYSIS_IMAGE_MAX_DIMENSION, ANALYSIS_IMAGE_MAX_DIMENSION))
                 opened.load()
                 image = ImageOps.exif_transpose(opened)
                 if image.mode in {"RGBA", "LA"} or "transparency" in image.info:
@@ -255,6 +256,26 @@ def photo_quality(image: Image.Image, landmarks) -> tuple[float, dict[str, float
         "contrast": round(contrast, 2),
         "sharpness": round(sharpness, 2),
     }
+
+
+def resize_for_analysis(image: Image.Image) -> Image.Image:
+    image.thumbnail(
+        (ANALYSIS_IMAGE_MAX_DIMENSION, ANALYSIS_IMAGE_MAX_DIMENSION),
+        Image.Resampling.LANCZOS,
+    )
+    return image
+
+
+def overall_presentation_index(
+    feature_score: float,
+    photo_condition: float,
+    composition: float,
+    quality: float,
+) -> float:
+    base_index = feature_score * 0.82 + photo_condition * 0.18
+    framing_penalty = clamp((0.60 - composition) / 0.35) * 0.18
+    clarity_penalty = clamp((0.50 - quality) / 0.25) * 0.08
+    return clamp(base_index - framing_penalty - clarity_penalty)
 
 
 def pose_from_matrix(matrix) -> tuple[float, dict[str, float]]:
@@ -350,7 +371,7 @@ def measure(landmarks, image: Image.Image, pose_matrix=None) -> dict[str, float 
         + quality * 0.45
         + composition * 0.20
     )
-    raw_index = clamp(feature_score * 0.82 + photo_condition * 0.18)
+    raw_index = overall_presentation_index(feature_score, photo_condition, composition, quality)
     score = presentation_score(raw_index)
     return {
         "harmony": harmony,
@@ -386,6 +407,11 @@ def score10(value: float) -> float:
 def presentation_score(value: float) -> float:
     """Map a 0-1 rule index linearly to the shared 5.0-9.5 display scale."""
     return round(5.0 + 4.5 * clamp(value), 1)
+
+
+def condition_score(value: float) -> float:
+    """Show photo conditions without the presentation scale's generous upward lift."""
+    return round(clamp(value * 10.0, 5.0, 9.5), 1)
 
 
 def choose_style(metrics: dict) -> dict:
@@ -474,7 +500,7 @@ def photo_check(metrics: dict) -> dict:
     else:
         tags.append("对比清楚")
 
-    if details["sharpness"] < 2.4:
+    if details["sharpness"] < 4.5:
         tags.append("清晰度一般")
         warnings_found.append("保持镜头稳定并对焦眼睛")
     else:
@@ -501,7 +527,10 @@ def photo_check(metrics: dict) -> dict:
         + metrics["pose_stability"] * 0.25
         + composition * 0.30
     )
-    if confidence >= 0.78:
+    if composition < 0.45 or metrics["quality"] < 0.45:
+        reference = "较低"
+        confidence_note = "照片裁切、清晰度或光线会明显限制细节判断。"
+    elif confidence >= 0.78:
         reference = "较高"
         confidence_note = "光线、清晰度、朝向与构图共同满足较稳定的观察条件。"
     elif confidence >= 0.52:
@@ -565,14 +594,14 @@ def build_report(metrics: dict) -> dict:
         },
         {
             "name": "照片质感",
-            "score": presentation_score(metrics["quality"]),
+            "score": condition_score(metrics["quality"]),
             "observation": "当前画面的曝光、对比与清晰度共同决定了面部细节在照片里的呈现。",
             "evidence": "这一项只衡量照片成像，不等同于真实肤质、皮肤状态或医学判断。",
             "suggestion": "优先使用窗边正面自然光，减少强磨皮与顶光，再判断妆面质感。",
         },
         {
             "name": "上镜稳定性",
-            "score": presentation_score(float(np.mean([metrics["harmony"], metrics["symmetry"], metrics["quality"], metrics["pose_stability"]]))),
+            "score": condition_score(float(np.mean([metrics["harmony"], metrics["symmetry"], metrics["quality"], metrics["pose_stability"]]))),
             "observation": "面部朝向稳定，当前结果对左右关系的参考价值较高。" if metrics["pose_stability"] >= 0.72 else "面部有轻微偏转，左右关系会受到角度影响，但仍可观察整体风格。",
             "evidence": "综合三轴面部姿态、左右眼位与画面清晰度，判断这张照片的分析可用性。",
             "suggestion": "镜头略高于眼睛，肩膀放松，面部只做很小幅度的侧转会更自然。",
@@ -644,7 +673,7 @@ def build_report(metrics: dict) -> dict:
         "summary": summary,
         "overview": {
             "feature_score": presentation_score(metrics["feature_score"]),
-            "photo_score": presentation_score(metrics["photo_condition"]),
+            "photo_score": condition_score(metrics["photo_condition"]),
         },
         "style": {
             "name": style["name"],
@@ -713,7 +742,7 @@ def analyze(photo: UploadFile = File(...)) -> dict:
 
         if min(image.size) < 240:
             raise HTTPException(400, "图片分辨率过低，短边至少需要 240 像素")
-        image.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
+        resize_for_analysis(image)
         image_array = np.ascontiguousarray(np.asarray(image, dtype=np.uint8))
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_array)
         with _model_lock:

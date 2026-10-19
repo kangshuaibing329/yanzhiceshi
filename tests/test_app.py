@@ -153,6 +153,13 @@ class MetricTests(unittest.TestCase):
         self.assertLess(edge_score, central_score)
         self.assertLess(details["min_margin"], 0.03)
 
+    def test_analysis_image_is_capped_without_upscaling(self):
+        large = app_module.resize_for_analysis(Image.new("RGB", (1600, 1200)))
+        small = app_module.resize_for_analysis(Image.new("RGB", (640, 480)))
+
+        self.assertEqual(large.size, (1024, 768))
+        self.assertEqual(small.size, (640, 480))
+
     def test_pose_matrix_penalizes_yaw(self):
         identity_score, identity_angles = app_module.pose_from_matrix(np.eye(4))
         radians = np.deg2rad(30)
@@ -177,6 +184,18 @@ class MetricTests(unittest.TestCase):
         self.assertEqual(app_module.presentation_score(0.60), 7.7)
         self.assertEqual(app_module.presentation_score(1.00), 9.5)
         self.assertLess(app_module.presentation_score(0.72), app_module.presentation_score(0.84))
+
+    def test_photo_condition_scale_is_more_conservative(self):
+        self.assertEqual(app_module.condition_score(0.00), 5.0)
+        self.assertEqual(app_module.condition_score(0.67), 6.7)
+        self.assertEqual(app_module.condition_score(1.00), 9.5)
+
+    def test_tight_framing_reduces_overall_presentation(self):
+        central = app_module.overall_presentation_index(0.70, 0.68, 0.80, 0.67)
+        tight = app_module.overall_presentation_index(0.70, 0.68, 0.38, 0.67)
+
+        self.assertGreater(central, tight)
+        self.assertLessEqual(app_module.presentation_score(tight), 7.7)
 
     def test_style_ties_are_reported_as_mixed_and_rank_deterministically(self):
         style = app_module.choose_style({
@@ -229,6 +248,21 @@ class MetricTests(unittest.TestCase):
         displayed_scores.extend(report["overview"].values())
         self.assertTrue(all(5.0 <= score <= 9.5 for score in displayed_scores))
 
+    def test_severe_tight_framing_forces_low_reference(self):
+        metrics = app_module.measure(
+            make_landmarks(),
+            Image.new("RGB", (320, 320), (150, 130, 120)),
+            np.eye(4),
+        )
+        metrics["quality"] = 0.67
+        metrics["quality_details"] = {"brightness": 151.0, "contrast": 39.0, "sharpness": 4.1}
+        metrics["composition"] = 0.38
+        result = app_module.photo_check(metrics)
+
+        self.assertEqual(result["reference"], "较低")
+        self.assertIn("构图过近或贴边", result["tags"])
+        self.assertIn("清晰度一般", result["tags"])
+
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
@@ -277,7 +311,7 @@ class ApiTests(unittest.TestCase):
         self.assertIn("share", payload)
         self.assertEqual(len(payload["share"]["formula"]), 3)
         self.assertEqual(len(payload["share"]["keywords"]), 3)
-        self.assertIn(payload["photo_check"]["reference"], {"中等", "较高"})
+        self.assertIn(payload["photo_check"]["reference"], {"较低", "中等", "较高"})
         self.assertEqual(len(payload["sections"]), 4)
         self.assertEqual(len(payload["advice"]), 3)
         self.assertIn("composition", payload["photo_check"])

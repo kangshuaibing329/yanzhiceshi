@@ -371,6 +371,9 @@
     const $ = (id) => document.getElementById(id);
     const state = { file:null, previewUrl:null, serviceReady:false, view:"upload", reportData:null, shareIndex:0, photoImage:null, previousFocus:null };
     const MAX_FILE_BYTES = 8 * 1024 * 1024;
+    const ANALYSIS_MAX_DIMENSION = 1280;
+    const ANALYSIS_JPEG_QUALITY = 0.88;
+    const ANALYSIS_PASSTHROUGH_BYTES = 1.5 * 1024 * 1024;
     const ALLOWED_FILE_TYPES = new Set(["image/jpeg","image/png","image/webp"]);
     const shareCanvases = [...document.querySelectorAll(".share-card-canvas")];
 
@@ -469,12 +472,38 @@
     }
 
     async function readResponse(response) { const contentType=response.headers.get("content-type")||"";if(contentType.includes("application/json"))return response.json();const body=await response.text();return{detail:body.trim()||`服务返回错误（${response.status}）`}; }
+    async function prepareAnalysisUpload(file) {
+      if(typeof createImageBitmap!=="function")return file;
+      let image;
+      try {
+        image=await createImageBitmap(file,{imageOrientation:"from-image"});
+        const longest=Math.max(image.width,image.height);
+        if(longest<=ANALYSIS_MAX_DIMENSION&&file.size<=ANALYSIS_PASSTHROUGH_BYTES)return file;
+        const scale=Math.min(1,ANALYSIS_MAX_DIMENSION/longest);
+        const canvas=document.createElement("canvas");
+        canvas.width=Math.max(1,Math.round(image.width*scale));
+        canvas.height=Math.max(1,Math.round(image.height*scale));
+        const context=canvas.getContext("2d",{alpha:false});
+        if(!context)return file;
+        context.fillStyle="#fff";
+        context.fillRect(0,0,canvas.width,canvas.height);
+        context.drawImage(image,0,0,canvas.width,canvas.height);
+        const blob=await new Promise((resolve)=>canvas.toBlob(resolve,"image/jpeg",ANALYSIS_JPEG_QUALITY));
+        if(!blob||blob.size>=file.size)return file;
+        const baseName=file.name.replace(/\.[^.]+$/,"")||"photo";
+        return new File([blob],`${baseName}-analysis.jpg`,{type:"image/jpeg",lastModified:file.lastModified});
+      } catch(_) {
+        return file;
+      } finally {
+        if(image&&typeof image.close==="function")image.close();
+      }
+    }
     async function checkService() { try{const response=await fetch("health",{cache:"no-store"});if(!response.ok)throw new Error("服务不可用");const status=await response.json();state.serviceReady=status.status==="ok"&&status.offline===true;$("modelStatus").textContent=state.serviceReady?"本站本地分析服务已准备好":"本地分析模型尚未就绪";$("modelStatus").style.color=state.serviceReady?"var(--accent-dark)":"var(--warm)";}catch(_){state.serviceReady=false;$("modelStatus").textContent="分析服务连接失败，请点击重试";$("modelStatus").style.color="#a53d35";}$("retryServiceBtn").classList.toggle("hidden",state.serviceReady);$("analyzeBtn").disabled=!(state.serviceReady&&state.file); }
     function resetExperience() { closeShareStudio();if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=null;state.previewUrl=null;state.reportData=null;state.photoImage=null;state.shareIndex=0;$("appShell").removeAttribute("data-theme");$("photoInput").value="";$("previewImage").removeAttribute("src");$("resultThumb").removeAttribute("src");$("fileStatus").textContent="";$("analysisStatus").textContent="";$("analyzeBtn").disabled=true;setView("upload");window.scrollTo({top:0,behavior:"smooth"}); }
     $("chooseBtn").addEventListener("click",()=>{$("photoInput").value="";$("photoInput").click();});
     $("photoInput").addEventListener("change",(event)=>{const file=event.target.files[0];if(!file)return;if(!ALLOWED_FILE_TYPES.has(file.type)){$("fileStatus").textContent="仅支持 JPG、PNG 或 WebP 图片";return;}if(file.size>MAX_FILE_BYTES){$("fileStatus").textContent="图片不能超过 8 MB";return;}if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.file=file;state.previewUrl=URL.createObjectURL(file);state.photoImage=null;$("previewImage").src=state.previewUrl;$("fileName").textContent=file.name;$("analysisStatus").textContent=state.serviceReady?"照片已就绪，可以开始分析":"分析服务尚未连接，请稍候";$("analyzeBtn").disabled=!state.serviceReady;setView("preview");window.scrollTo({top:0,behavior:"smooth"});});
     $("resetBtn").addEventListener("click",resetExperience);$("retestTopBtn").addEventListener("click",resetExperience);$("retestBottomBtn").addEventListener("click",resetExperience);$("retryServiceBtn").addEventListener("click",checkService);
-    $("analyzeBtn").addEventListener("click",async()=>{if(!state.file||!state.serviceReady)return;const button=$("analyzeBtn");button.disabled=true;button.textContent="正在生成报告…";$("analysisStatus").textContent="正在检测面部关键点、照片条件与风格倾向";setView("analyzing");const form=new FormData();form.append("photo",state.file);const controller=new AbortController(),timeout=window.setTimeout(()=>controller.abort(),90000);try{const response=await fetch("api/analyze",{method:"POST",body:form,signal:controller.signal});const payload=await readResponse(response);if(!response.ok)throw new Error(payload.detail||"分析失败");renderReport(payload);}catch(error){const message=error.name==="AbortError"?"分析超时，请稍后重试":error.message;$("analysisStatus").textContent=`分析失败：${message}`;setView("preview");}finally{window.clearTimeout(timeout);button.disabled=!(state.serviceReady&&state.file);button.textContent="生成我的报告";}});
+    $("analyzeBtn").addEventListener("click",async()=>{if(!state.file||!state.serviceReady)return;const button=$("analyzeBtn");button.disabled=true;button.textContent="正在生成报告…";$("analysisStatus").textContent="正在优化照片并检测面部关键点";setView("analyzing");let timeout;try{const uploadFile=await prepareAnalysisUpload(state.file);$("analysisStatus").textContent="正在检测面部关键点、照片条件与风格倾向";const form=new FormData();form.append("photo",uploadFile,uploadFile.name);const controller=new AbortController();timeout=window.setTimeout(()=>controller.abort(),90000);const response=await fetch("api/analyze",{method:"POST",body:form,signal:controller.signal});const payload=await readResponse(response);if(!response.ok)throw new Error(payload.detail||"分析失败");renderReport(payload);}catch(error){const message=error.name==="AbortError"?"分析超时，请稍后重试":error.message;$("analysisStatus").textContent=`分析失败：${message}`;setView("preview");}finally{if(timeout)window.clearTimeout(timeout);button.disabled=!(state.serviceReady&&state.file);button.textContent="生成我的报告";}});
     $("shareBtn").addEventListener("click",openShareStudio);$("closeShareBtn").addEventListener("click",closeShareStudio);$("prevCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex-1));$("nextCardBtn").addEventListener("click",()=>showShareCard(state.shareIndex+1));$("hidePhotoToggle").addEventListener("change",drawShareCards);$("downloadCardBtn").addEventListener("click",downloadCurrentCard);$("downloadBtn").addEventListener("click",()=>window.print());$("shareModal").addEventListener("click",(event)=>{if(event.target===$("shareModal"))closeShareStudio();});document.addEventListener("keydown",(event)=>{if($("shareModal").classList.contains("hidden"))return;if(event.key==="Escape"){closeShareStudio();return;}if(event.key!=="Tab")return;const focusable=[...$("shareModal").querySelectorAll("button,input")].filter((item)=>!item.disabled);const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}});window.addEventListener("beforeunload",()=>{if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);});
     setupShareDots();setView("upload");checkService();
   </script>
