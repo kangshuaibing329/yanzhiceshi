@@ -24,6 +24,21 @@ jobs:
       - name: Run backend tests
         run: python -m unittest discover -s tests -v
 
+  real-model-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r server/requirements.txt
+      - name: Start real offline model and verify inference
+        run: python tests/real_model_smoke.py
+
   frontend-static-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
